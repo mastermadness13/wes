@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>تعديل محاضرة</h2>
+<form method="post">
+    {% if users %}
+    <div class="form-group">
+        <label>المستخدم</label>
+        <select class="form-control" name="user_id" required>
+            {% for u in users %}
+            <option value="{{ u.id }}" {% if u.id == entry.user_id %}selected{% endif %}>{{ u.username }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endif %}
+    <div class="form-group"><label>اليوم</label>
+        <select class="form-control" name="day" required>
+            <option value="الأحد" {% if 'الأحد' == entry.day %}selected{% endif %}>الأحد</option>
+            <option value="الاثنين" {% if 'الاثنين' == entry.day %}selected{% endif %}>الاثنين</option>
+            <option value="الثلاثاء" {% if 'الثلاثاء' == entry.day %}selected{% endif %}>الثلاثاء</option>
+            <option value="الأربعاء" {% if 'الأربعاء' == entry.day %}selected{% endif %}>الأربعاء</option>
+            <option value="الخميس" {% if 'الخميس' == entry.day %}selected{% endif %}>الخميس</option>
+        </select>
+    </div>
+    <div class="form-group"><label>الفصل الدراسي</label>
+        <select class="form-control" name="semester" required>
+            <option value="1" {% if entry.semester == 1 %}selected{% endif %}>1</option>
+            <option value="2" {% if entry.semester == 2 %}selected{% endif %}>2</option>
+        </select>
+    </div>
+    <div class="form-group"><label>الشعبة</label>
+        <select class="form-control" name="section" required>
+            <option value="A" {% if entry.section == 'A' %}selected{% endif %}>A</option>
+            <option value="B" {% if entry.section == 'B' %}selected{% endif %}>B</option>
+        </select>
+    </div>
+    <div class="form-group"><label>المادة</label>
+        <select class="form-control" name="course_id" required>
+            {% for c in courses %}
+            <option value="{{ c.id }}" {% if c.id == entry.course_id %}selected{% endif %}>{{ c.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group"><label>المدرس</label>
+        <select class="form-control" name="teacher_id" required>
+            {% for t in teachers %}
+            <option value="{{ t.id }}" {% if t.id == entry.teacher_id %}selected{% endif %}>{{ t.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group"><label>القاعة</label>
+        <select class="form-control" name="room_id" required>
+            {% for r in rooms %}
+            <option value="{{ r.id }}" {% if r.id == entry.room_id %}selected{% endif %} {% if r.status == 'غير متاحة' %}disabled{% endif %} {% if r.status == 'مقفلة' and session.role != 'super_admin' %}style="display:none;"{% endif %}>
+                {{ r.name_ar or r.name }} ({{ r.type }})
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    <button class="btn btn-primary" type="submit">حفظ</button>
+</form>
+{% endblock %}

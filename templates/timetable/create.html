@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>إضافة محاضرة</h2>
+<form method="post">
+    {% if users %}
+    <div class="form-group">
+        <label>المستخدم</label>
+        <select class="form-control" name="user_id" required>
+            {% for u in users %}
+            <option value="{{ u.id }}">{{ u.username }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% endif %}
+    <div class="form-group"><label>اليوم</label>
+        <select class="form-control" name="day" required>
+            <option value="الأحد">الأحد</option>
+            <option value="الاثنين">الاثنين</option>
+            <option value="الثلاثاء">الثلاثاء</option>
+            <option value="الأربعاء">الأربعاء</option>
+            <option value="الخميس">الخميس</option>
+        </select>
+    </div>
+    <div class="form-group"><label>الفصل الدراسي</label>
+        <select class="form-control" name="semester" required>
+            <option value="1">1</option>
+            <option value="2">2</option>
+        </select>
+    </div>
+    <div class="form-group"><label>الشعبة</label>
+        <select class="form-control" name="section" required><option value="A">A</option><option value="B">B</option></select>
+    </div>
+    <div class="form-group"><label>المادة</label>
+        <select class="form-control" name="course_id" required>
+            {% for c in courses %}
+            <option value="{{ c.id }}">{{ c.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group"><label>المدرس</label>
+        <select class="form-control" name="teacher_id" required>
+            {% for t in teachers %}
+            <option value="{{ t.id }}">{{ t.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group"><label>القعة</label><input class="form-control" name="room" required></div>
+    <button class="btn btn-success" type="submit">حفظ</button>
+</form>
+{% endblock %}

@@ -1,0 +1,28 @@
+{
+  "counts": {
+    "users": 9,
+    "departments": 6,
+    "teachers": 37,
+    "courses": 31,
+    "timetable": 120,
+    "rooms": 7
+  },
+  "days": [
+    "الأحد",
+    "الأربعاء",
+    "الاثنين",
+    "الثلاثاء",
+    "الخميس"
+  ],
+  "bad_days": [],
+  "valid_rooms": [
+    "Archimedes Room 1",
+    "Archimedes Room 2",
+    "Class 20 MT 1",
+    "Class 20 MT 2",
+    "Lab 1",
+    "Lab 2",
+    "Masrah"
+  ],
+  "bad_rooms": []
+}

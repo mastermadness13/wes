@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+/* تحسين الأزرار */
+.btn {
+  border-radius: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  border: none;
+  font-weight: 500;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #0056b3;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background-color: #545b62;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #c82333;
+}
+
+.btn-success {
+  background-color: #28a745;
+  color: white;
+}
+
+.btn-success:hover {
+  background-color: #1e7e34;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* Responsive للأزرار */
+@media (max-width: 768px) {
+  .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+}
+</style>
+<h2>الحضور</h2>
+<form class="form-inline mb-3" method="get">
+    <select class="form-control mr-2" name="student_id">
+        <option value="">جميع الطلاب</option>
+        {% for s in students %}
+        <option value="{{ s.id }}" {% if student_id|int == s.id %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+    </select>
+    <button class="btn btn-primary" type="submit">تصفية</button>
+</form>
+<a href="{{ url_for('attendance.create_attendance') }}" class="btn btn-success mb-3">إضافة سجل حضور</a>
+<table class="table table-bordered">
+    <thead class="thead-dark"><tr><th>#</th><th>الطالب</th><th>التاريخ</th><th>الحالة</th><th>ملاحظات</th><th>إجراءات</th></tr></thead>
+    <tbody>
+    {% for r in records %}
+        <tr>
+            <td>{{ r.id }}</td>
+            <td>{{ r.student_name }}</td>
+            <td>{{ r.date }}</td>
+            <td>{{ r.status }}</td>
+            <td>{{ r.note }}</td>
+            <td>
+                <form method="post" action="{{ url_for('attendance.delete_attendance', id=r.id) }}" style="display:inline;" onsubmit="return confirm('هل أنت متأكد؟');">
+                    <button class="btn btn-sm btn-danger">حذف</button>
+                </form>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

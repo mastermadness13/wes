@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h2>تعديل القاعة</h2>
+    <form method="post">
+        <div class="form-group">
+            <label>اسم القاعة (إنجليزي)</label>
+            <input type="text" class="form-control" name="name" value="{{ room.name }}" required>
+        </div>
+        <div class="form-group">
+            <label>اسم القاعة (عربي)</label>
+            <input type="text" class="form-control" name="name_ar" value="{{ room.name_ar }}">
+        </div>
+        <div class="form-group">
+            <label>نوع القاعة</label>
+            <select class="form-control" name="type" required>
+                <option value="قاعة" {% if room.type == 'قاعة' %}selected{% endif %}>قاعة</option>
+                <option value="معمل" {% if room.type == 'معمل' %}selected{% endif %}>معمل</option>
+                <option value="مسرح" {% if room.type == 'مسرح' %}selected{% endif %}>مسرح</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>حالة القاعة</label>
+            <select class="form-control" name="status" required>
+                <option value="متاحة" {% if room.status == 'متاحة' %}selected{% endif %}>متاحة</option>
+                <option value="غير متاحة" {% if room.status == 'غير متاحة' %}selected{% endif %}>غير متاحة</option>
+                <option value="مقفلة" {% if room.status == 'مقفلة' %}selected{% endif %}>مقفلة</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>السعة</label>
+            <input type="number" class="form-control" name="capacity" value="{{ room.capacity }}">
+        </div>
+        <div class="form-group">
+            <label>الموقع</label>
+            <input type="text" class="form-control" name="location" value="{{ room.location }}">
+        </div>
+        <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
+        <a href="{{ url_for('rooms.list_rooms') }}" class="btn btn-secondary">إلغاء</a>
+    </form>
+</div>
+{% endblock %}

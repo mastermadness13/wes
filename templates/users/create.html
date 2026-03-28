@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>إضافة مستخدم</h2>
+<form method="post">
+    <div class="form-group"><label>اسم المستخدم</label><input class="form-control" name="username" required></div>
+    <div class="form-group"><label>كلمة المرور</label><input type="password" class="form-control" name="password" required></div>
+    <div class="form-group"><label>الدور</label><select class="form-control" name="role" required><option value="admin">admin</option><option value="super_admin">super_admin</option></select></div>
+    <div class="form-group"><label>القسم</label><input class="form-control" name="label" required></div>
+    <button class="btn btn-success" type="submit">حفظ</button>
+</form>
+{% endblock %}

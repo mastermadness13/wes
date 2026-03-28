@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>تعديل مادة</h2>
+<form method="post">
+    <div class="form-group"><label>الاسم</label><input value="{{ course.name }}" class="form-control" name="name" required></div>
+    <div class="form-group"><label>الكود</label><input value="{{ course.code }}" class="form-control" name="code" required></div>
+    <div class="form-group"><label>القسم</label><input value="{{ course.department }}" class="form-control" name="department" required></div>
+    <button class="btn btn-primary" type="submit">تحديث</button>
+</form>
+{% endblock %}

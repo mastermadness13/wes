@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+/* تحسين الأزرار */
+.btn {
+  border-radius: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  border: none;
+  font-weight: 500;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.btn-primary {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #0056b3;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background-color: #545b62;
+}
+
+.btn-danger {
+  background-color: #dc3545;
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #c82333;
+}
+
+.btn-success {
+  background-color: #28a745;
+  color: white;
+}
+
+.btn-success:hover {
+  background-color: #1e7e34;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* Responsive للأزرار */
+@media (max-width: 768px) {
+  .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+}
+</style>
+<h2>قائمة المواد</h2>
+{% if session.role == 'super_admin' %}
+<form class="form-inline mb-3" method="get">
+    <input class="form-control mr-2" name="department" placeholder="القسم" value="{{ department }}">
+    <button class="btn btn-primary" type="submit">تصفية</button>
+</form>
+{% endif %}
+<button class="btn btn-success mb-3" data-toggle="modal" data-target="#addCourseModal">إضافة مادة</button>
+<table class="table table-bordered">
+    <thead class="thead-dark">
+    {% if session.role == 'super_admin' %}
+    <tr><th>#</th><th>الاسم</th><th>الكود</th><th>القسم</th><th>تاريخ</th><th>إجراءات</th></tr>
+    {% else %}
+    <tr><th>#</th><th>اسم المادة</th><th>المدرس</th><th>الفصل</th><th>إجراءات</th></tr>
+    {% endif %}
+    </thead>
+    <tbody>
+    {% for c in courses %}
+        <tr>
+            <td>{{ c.id }}</td>
+            {% if session.role == 'super_admin' %}
+            <td>{{ c.name }}</td>
+            <td>{{ c.code }}</td>
+            <td>{{ c.department }}</td>
+            <td>{{ c.created_at }}</td>
+            {% else %}
+            <td>{{ c.name }}</td>
+            <td>{{ c.teachers or 'غير محدد' }}</td>
+            <td>{{ c.semesters or 'غير محدد' }}</td>
+            {% endif %}
+            <td>
+                <a href="{{ url_for('courses.edit_course', id=c.id) }}" class="btn btn-sm btn-primary">تعديل</a>
+                <form method="post" action="{{ url_for('courses.delete_course', id=c.id) }}" style="display:inline;" onsubmit="return confirm('هل أنت متأكد؟');">
+                    <button class="btn btn-sm btn-danger" type="submit">حذف</button>
+                </form>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<!-- Modal for adding course -->
+<div class="modal fade" id="addCourseModal" tabindex="-1" role="dialog" aria-labelledby="addCourseModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="addCourseModalLabel">إضافة مادة</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <form method="POST" action="{{ url_for('courses.create_course') }}">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>اسم المادة</label>
+            <input class="form-control" name="name" required>
+          </div>
+          <div class="form-group">
+            <label>الكود</label>
+            <input class="form-control" name="code" required>
+          </div>
+          <div class="form-group">
+            <label>القسم</label>
+            <input class="form-control" name="department" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">إلغاء</button>
+          <button type="submit" class="btn btn-primary">حفظ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
