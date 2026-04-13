@@ -1,4 +1,4 @@
-PRAGMA foreign_keys = ON;
+﻿PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS courses (
     name TEXT NOT NULL,
     code TEXT NOT NULL,
     department TEXT NOT NULL,
+    year INTEGER NOT NULL DEFAULT 1,
+    notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
@@ -93,3 +95,26 @@ CREATE TABLE IF NOT EXISTS attendance (
     FOREIGN KEY (student_id) REFERENCES students (id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_attendance_user_id ON attendance(user_id);
+
+CREATE TABLE IF NOT EXISTS history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    action TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id INTEGER,
+    actor_user_id INTEGER,
+    actor_username TEXT,
+    message TEXT,
+    old_value TEXT,
+    new_value TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_history_created_at ON history(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS period_settings (
+    code TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    start_time TEXT NOT NULL,
+    end_time TEXT NOT NULL,
+    is_enabled INTEGER NOT NULL DEFAULT 1,
+    sort_order INTEGER NOT NULL
+);

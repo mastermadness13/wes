@@ -1,558 +1,172 @@
-{% extends "base.html" %}
-
+﻿{% extends 'base.html' %}
 {% block content %}
-
-<style>
-@media print {
-  .no-print { display: none !important; }
-  body { font-size: 12px; line-height: 1.2; margin: 0; padding: 10px; }
-  h3 { font-size: 18px; margin-bottom: 10px; }
-  table { font-size: 10px; width: 100%; border-collapse: collapse; }
-  .table th, .table td { padding: 4px; border: 1px solid #000; text-align: center; }
-  .table th { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .table-striped tbody tr:nth-of-type(odd) { background-color: #f8f9fa !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .text-muted { color: #6c757d !important; }
-  .align-middle { vertical-align: middle; }
-  .btn { display: none; }
-  form, .form-group, .modal { display: none; }
-  .d-flex { display: block; }
-  .mb-3, .mb-4 { margin-bottom: 10px; }
-  @page { size: A4; margin: 1cm; }
-}
-
-/* تحسين الأزرار */
-.btn {
-  border-radius: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
-  transition: all 0.2s ease;
-  border: none;
-  font-weight: 500;
-}
-
-.btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-}
-
-.btn-primary {
-  background-color: #007bff;
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: #0056b3;
-}
-
-.btn-secondary {
-  background-color: #6c757d;
-  color: white;
-}
-
-.btn-secondary:hover {
-  background-color: #545b62;
-}
-
-.btn-danger {
-  background-color: #dc3545;
-  color: white;
-}
-
-.btn-danger:hover {
-  background-color: #c82333;
-}
-
-.btn-sm {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-}
-
-/* تحسين القوائم المنسدلة */
-.dropdown-toggle {
-  border-radius: 0.375rem;
-  border: 2px solid #007bff;
-  background-color: white;
-  color: #007bff;
-  transition: all 0.2s ease;
-  position: relative;
-}
-
-.dropdown-toggle:hover {
-  background-color: #f8f9fa;
-  border-color: #0056b3;
-  color: #0056b3;
-}
-
-.dropdown-toggle:focus {
-  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-  border-color: #0056b3;
-}
-
-.dropdown-menu {
-  border: 1px solid #dee2e6;
-  border-radius: 0.375rem;
-  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-}
-
-.badge {
-  background-color: #6c757d;
-  border-radius: 0.25rem;
-  padding: 0.125rem 0.25rem;
-  font-size: 0.75rem;
-}
-
-/* تحسين checkboxes في القائمة المنسدلة */
-.dropdown-menu .form-check {
-  margin-bottom: 0.5rem;
-}
-
-.dropdown-menu .form-check-input {
-  width: 1rem;
-  height: 1rem;
-  margin-left: 0.25rem;
-  margin-right: 0;
-  border: 2px solid #007bff;
-  border-radius: 0.25rem;
-  background-color: white;
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
-
-.dropdown-menu .form-check-input:checked {
-  background-color: #007bff;
-  border-color: #007bff;
-}
-
-.dropdown-menu .form-check-input:checked::after {
-  content: '✓';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: white;
-  font-size: 0.7rem;
-  font-weight: bold;
-}
-
-.dropdown-menu .form-check-label {
-  margin-bottom: 0;
-  font-size: 0.875rem;
-  cursor: pointer;
-  user-select: none;
-  margin-right: 0.5rem;
-}
-
-/* Responsive للقوائم المنسدلة */
-@media (max-width: 768px) {
-  .dropdown-toggle {
-    font-size: 0.875rem;
-    padding: 0.375rem 0.75rem;
-  }
-  .dropdown-menu {
-    min-width: 180px;
-  }
-}
-</style>
-
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3> الجدول الدراسي</h3>
-  <button class="btn btn-primary" data-toggle="modal" data-target="#addLectureModal">إضافة محاضرة</button>
-</div>
-
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <form method="GET" class="d-flex align-items-center gap-2">
-    {% if users %}
-    <div class="me-3">
-      <label class="form-label mb-1">المستخدم</label>
-      <select name="user_id" class="form-select" onchange="this.form.submit()">
-        <option value="">جميع المستخدمين</option>
-        {% for u in users %}
-          <option value="{{ u.id }}" {% if u.id|string == selected_user_id %}selected{% endif %}>{{ u.username }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    {% endif %}
-    <div class="me-3">
-      <div class="dropdown">
-        <button class="btn btn-outline-primary dropdown-toggle" type="button" id="semesterDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          الفصل الدراسي
-          <span class="badge badge-secondary ml-2" id="selectedCount">{{ selected_semesters|length }}</span>
-        </button>
-        <div class="dropdown-menu p-3" aria-labelledby="semesterDropdown" style="min-width: 200px;">
-          <div class="form-check mb-2">
-            <input class="form-check-input" type="checkbox" id="selectAllSemesters">
-            <label class="form-check-label font-weight-bold" for="selectAllSemesters">
-              تحديد الكل
-            </label>
-          </div>
-          <hr class="my-2">
-          {% for sem in range(2, 8) %}
-          <div class="form-check">
-            <input class="form-check-input semester-checkbox" type="checkbox" name="semester" value="{{ sem }}" id="sem{{ sem }}"
-            {% if sem in selected_semesters %}checked{% endif %}>
-            <label class="form-check-label" for="sem{{ sem }}">
-              الفصل {{ sem }}
-            </label>
-          </div>
-          {% endfor %}
-          <hr class="my-2">
-          <button type="button" class="btn btn-primary btn-sm btn-block" id="applySemesterFilter">تطبيق</button>
-        </div>
+<div class="timetable-layout">
+  <section class="page-card timetable-hero no-print">
+    <div class="page-title">
+      <div class="page-summary">
+        <h2>جدول المقررات</h2>
+        <p>اعرض الجدول حسب القسم والفصل الدراسي، ثم اطبع العرض النظيف مباشرة.</p>
+      </div>
+      <div class="timetable-actions">
+        <a href="{{ url_for('timetable.create_timetable') }}" class="btn btn-success">إضافة حصة</a>
+        <button type="button" class="btn btn-outline-primary" onclick="window.print()">طباعة الجدول</button>
       </div>
     </div>
-  </form>
-  <button class="btn btn-secondary no-print" onclick="window.print()">طباعة الجدول</button>
-</div>
+  </section>
 
-{% if departments and departments|length > 1 %}
-<form method="GET" class="mb-4">
-  <div class="row g-2 align-items-center">
-    <div class="col-auto">
-      <label class="form-label">القسم</label>
-    </div>
-    <div class="col-auto">
-      <select name="department_id" class="form-select" onchange="this.form.submit()">
-        <option value="">كل الأقسام</option>
-        {% for dept in departments %}
-          <option value="{{ dept.id }}" {% if dept.id == selected_department_id %}selected{% endif %}>{{ dept.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-  </div>
-</form>
-{% endif %}
-
-<table class="table table-bordered table-striped">
-  <thead class="table-secondary">
-    <tr>
-      <th>اليوم</th>
-      {% for semester in semesters %}
-        <th colspan="2" class="text-center">الفصل {{ semester }}</th>
-      {% endfor %}
-    </tr>
-    <tr>
-      <th></th>
-      {% for semester in semesters %}
-        <th class="text-center">الفترة A (9-12)</th>
-        <th class="text-center">الفترة B (12-3)</th>
-      {% endfor %}
-    </tr>
-  </thead>
-  <tbody>
-    {% for day in days %}
-      <tr>
-        <td class="align-middle"><strong>{{ days_arabic[day] }}</strong></td>
-        {% for semester in semesters %}
-          {% for section in sections %}
-            {% set entry = timetable.get(day, {}).get(semester, {}).get(section) %}
-            <td class="align-middle" title="اليوم: {{ day }}, الوقت: {{ '9-12' if section == 'A' else '12-3' }}, القاعة: {{ entry.room_name }}">
-              {% if entry %}
-                <div><strong>{{ entry.course_name }}</strong></div>
-                <div>{{ entry.teacher_name }} - {{ entry.room_name }}</div>
-                <div class="mt-1">
-                  <button type="button" class="btn btn-sm btn-secondary open-edit-timetable-modal" data-id="{{ entry.id }}" data-day="{{ entry.day }}" data-semester="{{ entry.semester }}" data-section="{{ entry.section }}" data-course-id="{{ entry.course_id }}" data-teacher-id="{{ entry.teacher_id }}" data-room-id="{{ entry.room_id }}" data-user-id="{{ entry.user_id }}">تعديل</button>
-                  <form method="post" action="{{ url_for('timetable.delete_timetable', id=entry.id) }}" style="display:inline;" onsubmit="return confirm('هل أنت متأكد من حذف المحاضرة؟');">
-                    <button class="btn btn-sm btn-danger" type="submit">حذف</button>
-                  </form>
-                </div>
-              {% else %}
-                <span class="text-muted empty-cell" data-day="{{ day }}" data-semester="{{ semester }}" data-section="{{ section }}" style="cursor: pointer;">لا توجد محاضرة</span>
-              {% endif %}
-            </td>
+  <section class="page-card timetable-filter-card no-print">
+    <form method="get" class="timetable-filters">
+      <div class="form-group mb-0">
+        <label for="departmentFilter">القسم</label>
+        <select id="departmentFilter" name="department_id" class="form-control">
+          <option value="">كل الأقسام</option>
+          {% for dept in departments %}
+          <option value="{{ dept.id }}" {% if dept.id|string == selected_department_id %}selected{% endif %}>{{ dept.name }}</option>
           {% endfor %}
-        {% endfor %}
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
-
-<!-- Modal for adding lecture -->
-<div class="modal fade" id="addLectureModal" tabindex="-1" role="dialog" aria-labelledby="addLectureModalLabel" aria-hidden="true">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="addLectureModalLabel">إضافة محاضرة</h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
+        </select>
       </div>
-      <form method="POST" action="{{ url_for('timetable.create_timetable') }}">
-        <div class="modal-body">
-          {% if users %}
-          <div class="form-group">
-            <label>المستخدم</label>
-            <select class="form-control" name="user_id" required>
-              {% for u in users %}
-              <option value="{{ u.id }}" {% if u.id|string == selected_user_id %}selected{% endif %}>{{ u.username }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          {% endif %}
-          <div class="row">
-            <div class="col-md-6">
-              <div class="form-group">
-                <label>اليوم</label>
-                <select class="form-control" name="day" required>
-                <option value="السبت">السبت</option>
-                  <option value="الأحد">الأحد</option>
-                  <option value="الاثنين">الاثنين</option>
-                  <option value="الثلاثاء">الثلاثاء</option>
-                  <option value="الأربعاء">الأربعاء</option>
-                  <option value="الخميس">الخميس</option>
-                </select>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="form-group">
-                <label>الفصل الدراسي</label>
-                <select class="form-control" name="semester" required>
-                  <option value="1">1</option>
-                  <option value="2">2</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-md-6">
-              <div class="form-group">
-                <label>الشعبة</label>
-                <select class="form-control" name="section" required>
-                  <option value="A">A</option>
-                  <option value="B">B</option>
-                </select>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="form-group">
-                <label>المادة</label>
-                <select class="form-control" name="course_id" required>
-                  {% for c in courses %}
-                  <option value="{{ c.id }}">{{ c.name }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-md-6">
-              <div class="form-group">
-                <label>المدرس</label>
-                <select class="form-control" name="teacher_id" required>
-                  {% for t in teachers %}
-                  <option value="{{ t.id }}">{{ t.name }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="form-group">
-                <label>القاعة</label>
-                <select class="form-control" name="room_id" required>
-                  {% for r in rooms %}
-                  <option value="{{ r.id }}" {% if r.status == 'غير متاحة' %}disabled{% endif %} {% if r.status == 'مقفلة' and session.role != 'super_admin' %}style="display:none;"{% endif %}>
-                    {{ r.name_ar or r.name }} ({{ r.type }})
-                  </option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-          </div>
+
+      <div class="form-group mb-0 full">
+        <label>الفصول الدراسية</label>
+        <div class="badge-stack">
+          {% for semester in allowed_semesters %}
+          <label class="badge-soft mb-0">
+            <input type="checkbox" name="semester" value="{{ semester }}" {% if semester in selected_semesters %}checked{% endif %}>
+            <span>الفصل {{ semester }}</span>
+          </label>
+          {% endfor %}
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">إلغاء</button>
-          <button type="submit" class="btn btn-primary">حفظ</button>
+      </div>
+
+      <div class="form-group mb-0 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary">تطبيق</button>
+      </div>
+      <div class="form-group mb-0 d-flex align-items-end">
+        <a href="{{ url_for('timetable.list_timetable') }}" class="btn btn-outline-secondary">إعادة الضبط</a>
+      </div>
+    </form>
+  </section>
+
+  {% if session.role == 'super_admin' %}
+  <section class="page-card no-print">
+    <button class="btn btn-link p-0 mb-3" data-toggle="periodSettings">تعديل إعدادات الفترات</button>
+    <div id="periodSettings" class="collapsible">
+      <form method="post" action="{{ url_for('timetable.update_period_settings') }}">
+        <div class="timetable-period-grid">
+          {% for period in period_settings %}
+          <div class="period-card">
+            <div class="form-group">
+              <label>اسم الفترة</label>
+              <input class="form-control" name="{{ period.code }}_label" value="{{ period.label }}" required>
+            </div>
+            <div class="form-row">
+              <div class="form-group col-6">
+                <label>البداية</label>
+                <input class="form-control" type="time" name="{{ period.code }}_start" value="{{ period.start_time }}" required>
+              </div>
+              <div class="form-group col-6">
+                <label>النهاية</label>
+                <input class="form-control" type="time" name="{{ period.code }}_end" value="{{ period.end_time }}" required>
+              </div>
+            </div>
+            <div class="custom-control custom-switch">
+              <input class="custom-control-input" type="checkbox" id="period_{{ period.code }}" name="{{ period.code }}_enabled" value="1" {% if period.is_enabled %}checked{% endif %}>
+              <label class="custom-control-label" for="period_{{ period.code }}">تفعيل الفترة</label>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="mt-3">
+          <button class="btn btn-primary" type="submit">حفظ الإعدادات</button>
         </div>
       </form>
     </div>
-  </div>
-</div>
+  </section>
+  {% endif %}
 
-<!-- Modal for editing lecture -->
-<div class="modal fade" id="editLectureModal" tabindex="-1" role="dialog" aria-labelledby="editLectureModalLabel" aria-hidden="true">
-  <div class="modal-dialog" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="editLectureModalLabel">تعديل محاضرة</h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <form method="POST" id="editLectureForm" action="">
-        <div class="modal-body">
-          {% if users %}
-          <div class="form-group">
-            <label>المستخدم</label>
-            <select class="form-control" name="user_id" id="edit_user_id" required>
-              {% for u in users %}
-              <option value="{{ u.id }}">{{ u.username }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          {% endif %}
-          <div class="form-group">
-            <label>اليوم</label>
-            <select class="form-control" name="day" id="edit_day" required>
-              <option value="السبت">السبت</option>
-              <option value="الأحد">الأحد</option>
-              <option value="الاثنين">الاثنين</option>
-              <option value="الثلاثاء">الثلاثاء</option>
-              <option value="الأربعاء">الأربعاء</option>
-              <option value="الخميس">الخميس</option>
-              <option value="الجمعة">الجمعة</option>
-            </select>
-          </div>
-          <div class="row">
-            <div class="col-md-6">
-              <div class="form-group">
-                <label>الفصل الدراسي</label>
-                <select class="form-control" name="semester" id="edit_semester" required>
-                  <option value="1">1</option>
-                  <option value="2">2</option>
-                </select>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="form-group">
-                <label>الشعبة</label>
-                <select class="form-control" name="section" id="edit_section" required>
-                  <option value="A">A</option>
-                  <option value="B">B</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-md-6">
-              <div class="form-group">
-                <label>المادة</label>
-                <select class="form-control" name="course_id" id="edit_course_id" required>
-                  {% for c in courses %}
-                  <option value="{{ c.id }}">{{ c.name }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="form-group">
-                <label>المدرس</label>
-                <select class="form-control" name="teacher_id" id="edit_teacher_id" required>
-                  {% for t in teachers %}
-                  <option value="{{ t.id }}">{{ t.name }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>القعة</label>
-            <select class="form-control" name="room_id" id="edit_room_id" required>
-              {% for r in rooms %}
-              <option value="{{ r.id }}" {% if r.status == 'غير متاحة' %}disabled{% endif %} {% if r.status == 'مقفلة' and session.role != 'super_admin' %}style="display:none;"{% endif %}>
-                {{ r.name_ar or r.name }} ({{ r.type }})
-              </option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">إلغاء</button>
-          <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
-        </div>
-      </form>
+  <section class="page-card timetable-card print-area">
+    <div class="print-header">
+      <h2>{{ selected_department_name or 'جميع الأقسام' }}</h2>
+      <p>{% for semester in selected_semesters %}الفصل {{ semester }}{% if not loop.last %}، {% endif %}{% endfor %}</p>
     </div>
-  </div>
+
+    <div class="timetable-summary mb-3 no-print">
+      <div class="summary-line">
+        <span class="badge-soft">القسم: {{ selected_department_name or 'كل الأقسام' }}</span>
+        <span class="badge-soft">الفصول: {% for semester in selected_semesters %}{{ semester }}{% if not loop.last %}، {% endif %}{% endfor %}</span>
+      </div>
+      <div class="small-note">الجدول يعرض فقط الفصول المختارة والفترة المفعلة.</div>
+    </div>
+
+    <div class="semester-stack">
+      {% for semester in selected_semesters %}
+      <section class="timetable-subsection" data-semester="{{ semester }}">
+        <div class="table-head mb-3 no-print">
+          <div>
+            <h3 class="mb-1">الفصل {{ semester }}</h3>
+            <p class="mb-0">عرض يومي مرتب مع أزرار تعديل سريعة.</p>
+          </div>
+        </div>
+
+        <div class="timetable-table-wrap">
+          <table class="table table-bordered timetable-print-table">
+            <colgroup>
+              <col class="day-col">
+              {% for period in enabled_periods %}
+              <col>
+              {% endfor %}
+            </colgroup>
+            <thead>
+              <tr>
+                <th>اليوم</th>
+                {% for period in enabled_periods %}
+                <th data-period-code="{{ period.code }}">
+                  <div>{{ period.label }}</div>
+                  <small class="metadata-only text-muted">{{ period.start_time }} - {{ period.end_time }}</small>
+                </th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for day in days %}
+              <tr>
+                <td><div class="day-label">{{ day_labels.get(day, day) }}</div></td>
+                {% for period in enabled_periods %}
+                {% set entry = timetable.get(day, {}).get(semester, {}).get(period.code) %}
+                <td>
+                  {% if entry %}
+                  <div class="schedule-item" data-edit-url="{{ url_for('timetable.edit_timetable', id=entry.id) }}">
+                    <div class="schedule-course">{{ entry.course_name }}</div>
+                    <div class="schedule-teacher">{{ entry.teacher_name }}</div>
+                    <div class="schedule-room">{{ entry.room_name_ar or entry.room_name }}</div>
+                    {% if session.role == 'super_admin' %}
+                    {% endif %}
+                    <div class="schedule-actions no-print">
+                      <a href="{{ url_for('timetable.edit_timetable', id=entry.id) }}" class="btn btn-sm btn-outline-primary">تعديل</a>
+                      {% if can_delete_critical %}
+                      <button class="btn btn-sm btn-outline-danger delete-entry-btn" type="button" data-id="{{ entry.id }}">حذف</button>
+                      {% endif %}
+                    </div>
+                  </div>
+                  {% else %}
+                  <div class="empty-cell no-print">إضافة</div>
+                  <div class="d-none d-print-block">—</div>
+                  {% endif %}
+                </td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+      {% endfor %}
+    </div>
+  </section>
 </div>
 
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const selectAllCheckbox = document.getElementById('selectAllSemesters');
-    const semesterCheckboxes = document.querySelectorAll('.semester-checkbox');
-    const selectedCountBadge = document.getElementById('selectedCount');
-    const applyButton = document.getElementById('applySemesterFilter');
-
-    // Function to update selected count
-    function updateSelectedCount() {
-      const checkedBoxes = document.querySelectorAll('.semester-checkbox:checked');
-      selectedCountBadge.textContent = checkedBoxes.length;
-    }
-
-    // Function to check if all individual checkboxes are checked
-    function areAllChecked() {
-      return Array.from(semesterCheckboxes).every(cb => cb.checked);
-    }
-
-    // Function to check if some (but not all) checkboxes are checked
-    function areSomeChecked() {
-      const checkedBoxes = document.querySelectorAll('.semester-checkbox:checked');
-      return checkedBoxes.length > 0 && checkedBoxes.length < semesterCheckboxes.length;
-    }
-
-    // Handle "Select All" checkbox
-    selectAllCheckbox.addEventListener('change', function() {
-      semesterCheckboxes.forEach(cb => {
-        cb.checked = this.checked;
-      });
-      updateSelectedCount();
-    });
-
-    // Handle individual checkboxes
-    semesterCheckboxes.forEach(cb => {
-      cb.addEventListener('change', function() {
-        if (!this.checked) {
-          selectAllCheckbox.checked = false;
-        } else if (areAllChecked()) {
-          selectAllCheckbox.checked = true;
-        }
-        updateSelectedCount();
-      });
-    });
-
-    // Handle apply button
-    applyButton.addEventListener('click', function() {
-      // Close the dropdown
-      $('.dropdown').removeClass('show');
-      $('.dropdown-menu').removeClass('show');
-
-      // Submit the form
-      const form = document.querySelector('form');
-      form.submit();
-    });
-
-    // Handle dropdown show event to update select all state
-    $('#semesterDropdown').on('shown.bs.dropdown', function() {
-      selectAllCheckbox.checked = areAllChecked();
-      updateSelectedCount();
-    });
-
-    // Initialize count on page load
-    updateSelectedCount();
-  });
-
-  // Handle empty cell clicks to assign teacher
-  document.addEventListener('DOMContentLoaded', function() {
-    const emptyCells = document.querySelectorAll('.empty-cell');
-    emptyCells.forEach(cell => {
-      cell.addEventListener('click', function() {
-        const day = this.getAttribute('data-day');
-        const semester = this.getAttribute('data-semester');
-        const section = this.getAttribute('data-section');
-
-        // Set form values
-        const modal = document.getElementById('addLectureModal');
-        modal.querySelector('select[name="day"]').value = day;
-        modal.querySelector('select[name="semester"]').value = semester;
-        modal.querySelector('select[name="section"]').value = section;
-
-        // If user_id is selected, set it
-        {% if selected_user_id %}
-        modal.querySelector('select[name="user_id"]').value = '{{ selected_user_id }}';
-        {% endif %}
-
-        // Show the modal
-        $('#addLectureModal').modal('show');
-      });
-    });
-  });
-</script>
-
+<script src="{{ url_for('static', filename='js/timetable.js') }}"></script>
 {% endblock %}
+
+
+

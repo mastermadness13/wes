@@ -1,10 +1,26 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2>تعديل مدرس</h2>
+<h2>تعديل المدرس</h2>
 <form method="post">
-    <div class="form-group"><label>الاسم</label><input value="{{ teacher.name }}" class="form-control" name="name" required></div>
-    <div class="form-group"><label>القسم</label><input value="{{ teacher.department }}" class="form-control" name="department" required></div>
-    <div class="form-group"><label>المادة</label><input value="{{ teacher.subject }}" class="form-control" name="subject" required></div>
-    <button class="btn btn-primary" type="submit">تحديث</button>
+    <div class="form-group"><label>Name</label><input value="{{ teacher.name }}" class="form-control" name="name" required></div>
+    <div class="form-group">
+        <label>Department</label>
+        <select class="form-control" name="department" required>
+            <option value="">Select department</option>
+            {% for d in departments %}
+            <option value="{{ d.name }}" {% if d.name == teacher.department %}selected{% endif %}>{{ d.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Subject</label>
+        <select class="form-control" name="subject" required>
+            <option value="">Select subject</option>
+            {% for s in subjects %}
+            <option value="{{ s.name }}" {% if s.name == teacher.subject %}selected{% endif %}>{{ s.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <button class="btn btn-primary" type="submit">Update</button>
 </form>
 {% endblock %}

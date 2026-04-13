@@ -1,22 +1,35 @@
 from functools import wraps
-from flask import session, redirect, url_for, flash
+from flask import flash, redirect, session, url_for
 
 
 def login_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
         if 'user_id' not in session:
-            flash('يرجى تسجيل الدخول أولاً', 'danger')
+            flash('يجب تسجيل الدخول أولاً.', 'danger')
             return redirect(url_for('auth.login'))
         return view(*args, **kwargs)
+
     return wrapped
+
+
+def role_required(*allowed_roles):
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            if session.get('role') not in allowed_roles:
+                flash('ليس لديك صلاحية الوصول إلى هذه الصفحة.', 'danger')
+                return redirect(url_for('auth.dashboard'))
+            return view(*args, **kwargs)
+
+        return wrapped
+
+    return decorator
 
 
 def super_admin_required(view):
-    @wraps(view)
-    def wrapped(*args, **kwargs):
-        if session.get('role') != 'super_admin':
-            flash('صلاحيات غير كافية', 'danger')
-            return redirect(url_for('auth.dashboard'))
-        return view(*args, **kwargs)
-    return wrapped
+    return role_required('super_admin')(view)
+
+
+def courses_timetable_admin_required(view):
+    return role_required('admin', 'super_admin')(view)

@@ -1,100 +1,64 @@
 {% extends 'base.html' %}
 {% block content %}
 <style>
-/* تحسين الأزرار */
-.btn {
-  border-radius: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
-  transition: all 0.2s ease;
-  border: none;
-  font-weight: 500;
-}
-
-.btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-}
-
-.btn-primary {
-  background-color: #007bff;
-  color: white;
-}
-
-.btn-primary:hover {
-  background-color: #0056b3;
-}
-
-.btn-secondary {
-  background-color: #6c757d;
-  color: white;
-}
-
-.btn-secondary:hover {
-  background-color: #545b62;
-}
-
-.btn-danger {
-  background-color: #dc3545;
-  color: white;
-}
-
-.btn-danger:hover {
-  background-color: #c82333;
-}
-
-.btn-success {
-  background-color: #28a745;
-  color: white;
-}
-
-.btn-success:hover {
-  background-color: #1e7e34;
-}
-
-.btn-warning {
-  background-color: #ffc107;
-  color: #212529;
-}
-
-.btn-warning:hover {
-  background-color: #e0a800;
-}
-
-.btn-sm {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-}
-
-/* Responsive للأزرار */
-@media (max-width: 768px) {
-  .btn {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-  }
-}
+.users-page { display: grid; gap: 1.25rem; }
+.users-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); }
+.users-head { padding: 1.4rem 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.users-table-wrap { overflow-x: auto; }
+.users-table { margin-bottom: 0; }
+.users-table thead th { background: var(--surface-2); }
+.role-pill { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 700; }
+.role-pill.super { background: #e6f1ff; color: #1357b5; }
+.role-pill.admin { background: #edf7f3; color: #0b7963; }
 </style>
-<h2>إدارة المستخدمين</h2>
-<a class="btn btn-success mb-3" href="{{ url_for('users.create_user') }}">إضافة مستخدم</a>
-<table class="table table-bordered">
-    <thead class="thead-dark"><tr><th>#</th><th>اسم المستخدم</th><th>القسم</th><th>الدور</th><th>إنشاء</th><th>إجراءات</th></tr></thead>
-    <tbody>
-    {% for u in users %}
-        <tr>
+<div class="users-page">
+  <section class="users-card users-head">
+    <div>
+      <h2 class="mb-1">قائمة المستخدمين</h2>
+      <div class="text-muted">أدِر حسابات المستخدمين وحدد صلاحياتهم من هنا.</div>
+    </div>
+    <a class="btn btn-success" href="{{ url_for('users.create_user') }}">إضافة مستخدم</a>
+  </section>
+
+  <section class="users-card">
+    <div class="users-table-wrap">
+      <table class="table table-hover users-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>اسم المستخدم</th>
+            <th>التسمية</th>
+            <th>الدور</th>
+            <th>تاريخ الإنشاء</th>
+            <th>الإجراءات</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
             <td>{{ u.id }}</td>
             <td>{{ u.username }}</td>
             <td>{{ u.label }}</td>
-            <td>{{ u.role }}</td>
-            <td>{{ u.created_at }}</td>
             <td>
-                <a class="btn btn-sm btn-primary" href="{{ url_for('users.edit_user', user_id=u.id) }}">تعديل</a>
-                <a class="btn btn-sm btn-warning" href="{{ url_for('users.change_password', user_id=u.id) }}">تغيير كلمة المرور</a>
-                <form method="post" action="{{ url_for('users.delete_user', user_id=u.id) }}" style="display:inline;" onsubmit="return confirm('هل أنت متأكد؟');">
-                    <button class="btn btn-sm btn-danger" type="submit">حذف</button>
-                </form>
+              <span class="role-pill {{ 'super' if u.role == 'super_admin' else 'admin' }}">
+                {{ 'Super Admin (admin = 0)' if u.role == 'super_admin' else 'Admin (admin = 1)' }}
+              </span>
             </td>
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
+            <td>{{ u.created_at }}</td>
+            <td class="text-nowrap">
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('users.edit_user', user_id=u.id) }}">تعديل</a>
+              <a class="btn btn-sm btn-outline-warning" href="{{ url_for('users.change_password', user_id=u.id) }}">تغيير كلمة المرور</a>
+              <form method="post" action="{{ url_for('users.delete_user', user_id=u.id) }}" class="d-inline" onsubmit="return confirm('هل تريد حذف هذا المستخدم؟');">
+                <button class="btn btn-sm btn-outline-danger" type="submit">حذف</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted py-4">لا يوجد مستخدمون حتى الآن.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
 {% endblock %}

@@ -1,0 +1,51 @@
+DB path: C:\Users\MD.MASTER\OneDrive\Desktop\NewRepo\data.db
+tables=9
+TABLE: 'attendance'
+COLS: [('id', 'INTEGER'), ('user_id', 'INTEGER'), ('student_id', 'INTEGER'), ('date', 'TEXT'), ('status', 'TEXT'), ('note', 'TEXT'), ('created_at', 'TIMESTAMP')]
+ROW_COUNT: 0
+BAD_COUNT: 0
+
+TABLE: 'courses'
+COLS: [('id', 'INTEGER'), ('user_id', 'INTEGER'), ('name', 'TEXT'), ('code', 'TEXT'), ('department', 'TEXT'), ('created_at', 'TIMESTAMP'), ('year', 'INTEGER'), ('notes', 'TEXT')]
+ROW_COUNT: 2
+BAD: table=courses rowid=33 col=name val='?????? ????'
+BAD: table=courses rowid=33 col=notes val='??? ??????? ??? ????????'
+BAD_COUNT: 2
+
+TABLE: 'departments'
+COLS: [('id', 'INTEGER'), ('name', 'TEXT'), ('semesters', 'INTEGER'), ('majors', 'INTEGER'), ('created_at', 'TIMESTAMP')]
+ROW_COUNT: 2
+BAD_COUNT: 0
+
+TABLE: 'period_settings'
+COLS: [('code', 'TEXT'), ('label', 'TEXT'), ('start_time', 'TEXT'), ('end_time', 'TEXT'), ('is_enabled', 'INTEGER'), ('sort_order', 'INTEGER')]
+ROW_COUNT: 3
+BAD: table=period_settings rowid=1 col=label val='?????? A'
+BAD: table=period_settings rowid=2 col=label val='?????? B'
+BAD: table=period_settings rowid=3 col=label val='?????? C'
+BAD_COUNT: 3
+
+TABLE: 'rooms'
+COLS: [('id', 'INTEGER'), ('name', 'TEXT'), ('capacity', 'INTEGER'), ('location', 'TEXT'), ('created_at', 'TIMESTAMP'), ('name_ar', 'TEXT'), ('type', 'TEXT'), ('status', 'TEXT')]
+ROW_COUNT: 7
+BAD_COUNT: 0
+
+TABLE: 'students'
+COLS: [('id', 'INTEGER'), ('user_id', 'INTEGER'), ('name', 'TEXT'), ('department', 'TEXT'), ('class', 'TEXT'), ('created_at', 'TIMESTAMP')]
+ROW_COUNT: 0
+BAD_COUNT: 0
+
+TABLE: 'teachers'
+COLS: [('id', 'INTEGER'), ('user_id', 'INTEGER'), ('name', 'TEXT'), ('department', 'TEXT'), ('subject', 'TEXT'), ('created_at', 'TIMESTAMP')]
+ROW_COUNT: 1
+BAD_COUNT: 0
+
+TABLE: 'timetable'
+COLS: [('id', 'INTEGER'), ('user_id', 'INTEGER'), ('day', 'TEXT'), ('semester', 'INTEGER'), ('section', 'TEXT'), ('course_id', 'INTEGER'), ('teacher_id', 'INTEGER'), ('room_id', 'INTEGER'), ('created_at', 'TIMESTAMP')]
+ROW_COUNT: 1
+BAD_COUNT: 0
+
+TABLE: 'users'
+COLS: [('id', 'INTEGER'), ('username', 'TEXT'), ('password', 'TEXT'), ('role', 'TEXT'), ('label', 'TEXT'), ('created_at', 'TIMESTAMP'), ('department', 'TEXT')]
+ROW_COUNT: 3
+BAD_COUNT: 0

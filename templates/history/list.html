@@ -1,0 +1,87 @@
+﻿{% extends 'base.html' %}
+{% block content %}
+<div class="history-page">
+  <section class="page-card history-card print-area">
+    <div class="history-head">
+      <div>
+        <h2>سجل التغييرات</h2>
+        <p class="history-summary">راجع عمليات الإضافة والتعديل والحذف برسائل واضحة مع اسم المستخدم الحقيقي.</p>
+      </div>
+      <div class="history-actions no-print">
+        <button class="btn btn-outline-secondary" type="button" onclick="window.print()">طباعة السجل</button>
+      </div>
+    </div>
+
+    <form method="get" class="history-filters mt-3 no-print">
+      <div class="form-group mb-0">
+        <label for="actionFilter">الإجراء</label>
+        <select id="actionFilter" name="action" class="form-control">
+          <option value="">جميع الإجراءات</option>
+          <option value="ADD" {% if action == 'ADD' %}selected{% endif %}>إضافة</option>
+          <option value="EDIT" {% if action == 'EDIT' %}selected{% endif %}>تعديل</option>
+          <option value="DELETE" {% if action == 'DELETE' %}selected{% endif %}>حذف</option>
+        </select>
+      </div>
+      <div class="form-group mb-0">
+        <label for="entityFilter">النوع</label>
+        <select id="entityFilter" name="entity_type" class="form-control">
+          <option value="">كل الأنواع</option>
+          <option value="timetable" {% if entity_type == 'timetable' %}selected{% endif %}>الجدول الدراسي</option>
+          <option value="course" {% if entity_type == 'course' %}selected{% endif %}>المقررات</option>
+        </select>
+      </div>
+      <div class="form-group mb-0 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary">تصفية</button>
+      </div>
+      <div class="form-group mb-0 d-flex align-items-end">
+        <a href="{{ url_for('history.list_history') }}" class="btn btn-outline-secondary">إعادة الضبط</a>
+      </div>
+    </form>
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap mt-4 mb-3 no-print">
+      <div class="badge-stack">
+        <span class="count-badge">عدد السجلات: {{ entries|length }}</span>
+      </div>
+      <div class="small-note">يتم الترتيب من الأحدث إلى الأقدم.</div>
+    </div>
+
+    <div class="history-table-wrap">
+      <table class="table history-table">
+        <thead>
+          <tr>
+            <th>الوقت</th>
+            <th>المستخدم</th>
+            <th>الرسالة</th>
+            <th>النوع</th>
+            <th>الإجراء</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in entries %}
+          <tr class="history-row">
+            <td>{{ row.created_at }}</td>
+            <td>{{ row.actor_name }}</td>
+            <td>
+              <div>{{ row.message }}</div>
+              <details class="mt-2 no-print">
+                <summary>عرض القيم</summary>
+                <div class="mt-2">
+                  <div class="mb-2"><strong>قبل:</strong><pre class="raw-value">{{ row.old_display }}</pre></div>
+                  <div><strong>بعد:</strong><pre class="raw-value">{{ row.new_display }}</pre></div>
+                </div>
+              </details>
+            </td>
+            <td>{{ row.entity_type }}</td>
+            <td><span class="status-pill">{{ row.action }}</span></td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5" class="text-center py-4 text-muted">لا توجد سجلات حتى الآن.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

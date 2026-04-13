@@ -25,17 +25,5 @@
         </div>
     </div>
 </div>
-<script>
-document.getElementById('togglePassword').addEventListener('click', function() {
-    const passwordField = document.getElementById('password');
-    const button = this;
-    if (passwordField.type === 'password') {
-        passwordField.type = 'text';
-        button.textContent = 'إخفاء';
-    } else {
-        passwordField.type = 'password';
-        button.textContent = 'إظهار';
-    }
-});
-</script>
+<script src="/static/js/auth.js"></script>
 {% endblock %}

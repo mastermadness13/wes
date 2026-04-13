@@ -1,101 +1,77 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="container mt-4">
-    <h2>لوحة التحكم - المدير العام</h2>
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="card-title">المستخدمين</h5>
-                    <p class="card-text display-4">{{ users|length }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="card-title">الطلاب</h5>
-                    <p class="card-text display-4">{{ counts.students }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="card-title">المدرسين</h5>
-                    <p class="card-text display-4">{{ counts.teachers }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center">
-                <div class="card-body">
-                    <h5 class="card-title">المقررات</h5>
-                    <p class="card-text display-4">{{ counts.courses }}</p>
-                </div>
-            </div>
-        </div>
+<style>
+.dashboard-stack { display: grid; gap: 1.25rem; }
+.dashboard-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); padding: 1.25rem 1.5rem; }
+.dashboard-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem; }
+.metric-box { border: 1px solid var(--border); border-radius: 14px; padding: 1rem; background: var(--surface-2); text-align: center; }
+.metric-value { font-size: 2rem; font-weight: 800; }
+.list-clean { margin: 0; padding-right: 1rem; }
+</style>
+<div class="dashboard-stack">
+  <section class="dashboard-card">
+    <h2 class="mb-2">لوحة القيادة - المشرف</h2>
+    <p class="text-muted mb-0">يمنحك هذا القسم نظرة عامة على النظام والإحصائيات المهمة.</p>
+  </section>
+
+  <section class="dashboard-card">
+    <h4 class="mb-3">إحصائيات المستخدمين</h4>
+    <div class="dashboard-stats">
+      <div class="metric-box"><div>المستخدمون</div><div class="metric-value">{{ users|length }}</div></div>
+      <div class="metric-box"><div>الطلاب</div><div class="metric-value">{{ counts.students }}</div></div>
+      <div class="metric-box"><div>المدرسون</div><div class="metric-value">{{ counts.teachers }}</div></div>
+      <div class="metric-box"><div>المقررات</div><div class="metric-value">{{ counts.courses }}</div></div>
+      <div class="metric-box"><div>الجدول</div><div class="metric-value">{{ counts.timetable }}</div></div>
+      <div class="metric-box"><div>الأقسام</div><div class="metric-value">{{ counts.departments }}</div></div>
     </div>
-    <div class="row">
-        <div class="col-md-6">
-            <h4>المحاضرات اليوم</h4>
-            <ul class="list-group">
-                {% for lecture in today_lectures %}
-                <li class="list-group-item">{{ lecture.course_name }} - {{ lecture.teacher_name }} ({{ lecture.room_name }})</li>
-                {% else %}
-                <li class="list-group-item">لا توجد محاضرات اليوم</li>
-                {% endfor %}
-            </ul>
-        </div>
-        <div class="col-md-6">
-            <h4>النشاط الأخير</h4>
-            <ul class="list-group">
-                {% for activity in recent_activity %}
-                <li class="list-group-item">{{ activity.course_name }} - {{ activity.teacher_name }}</li>
-                {% else %}
-                <li class="list-group-item">لا يوجد نشاط</li>
-                {% endfor %}
-            </ul>
-        </div>
-    </div>
-    <div class="row mt-4">
-        <div class="col-md-6">
-            <h4>الأقسام</h4>
-            <ul class="list-group">
-                {% for dept in departments %}
-                <li class="list-group-item">{{ dept.name }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-        <div class="col-md-6">
-            <h4>المديرين</h4>
-            <ul class="list-group">
-                {% for admin in admins %}
-                <li class="list-group-item">{{ admin.username }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-    </div>
-    <h4 class="mb-2 mt-4">الإجراءات السريعة</h4>
-    <div class="row">
-        <div class="col-md-2">
-            <a href="{{ url_for('users.list_users') }}" class="btn btn-primary w-100">إدارة المستخدمين</a>
-        </div>
-        <div class="col-md-2">
-            <a href="{{ url_for('teachers.list_teachers') }}" class="btn btn-secondary w-100">إدارة المدرسين</a>
-        </div>
-        <div class="col-md-2">
-            <a href="{{ url_for('courses.list_courses') }}" class="btn btn-success w-100">إدارة المقررات</a>
-        </div>
-        <div class="col-md-2">
-            <a href="{{ url_for('departments.list_departments') }}" class="btn btn-warning w-100">إدارة الأقسام</a>
-        </div>
-        <div class="col-md-2">
-            <a href="{{ url_for('timetable.list_timetable') }}" class="btn btn-info w-100">إدارة الجدول</a>
-        </div>
-        <div class="col-md-2">
-            <a href="{{ url_for('attendance.list_attendance') }}" class="btn btn-dark w-100">إدارة الحضور</a>
-        </div>
-    </div>
+  </section>
+
+  <section class="dashboard-card">
+    <h4 class="mb-3">محاضرات اليوم</h4>
+    <ul class="list-clean">
+      {% for lecture in today_lectures %}
+      <li>{{ lecture.course_name }} - {{ lecture.teacher_name }} ({{ lecture.room_name }})</li>
+      {% else %}
+      <li>لا توجد محاضرات اليوم.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="dashboard-card">
+    <h4 class="mb-3">النشاط الأخير</h4>
+    <ul class="list-clean">
+      {% for activity in recent_activity %}
+      <li>{{ activity.course_name }} - {{ activity.teacher_name }}</li>
+      {% else %}
+      <li>لا يوجد نشاط حديث.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="dashboard-card">
+    <h4 class="mb-3">الأقسام</h4>
+    <ul class="list-clean">
+      {% for dept in departments %}
+      <li>{{ dept.name }}</li>
+      {% else %}
+      <li>لا توجد أقسام.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="dashboard-card">
+    <h4 class="mb-3">المسؤولون</h4>
+    <ul class="list-clean">
+      {% for admin in admins %}
+      <li>{{ admin.username }}</li>
+      {% else %}
+      <li>لا يوجد مسؤولون.</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="dashboard-card">
+    <a href="{{ url_for('timetable.list_timetable') }}?semester=1&semester=2&semester=3&semester=4&semester=5&semester=6&semester=7" class="btn btn-primary">عرض الجدول الدراسي الكامل</a>
+  </section>
 </div>
 {% endblock %}

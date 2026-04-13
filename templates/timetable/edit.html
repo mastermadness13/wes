@@ -1,61 +1,87 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% block content %}
-<h2>تعديل محاضرة</h2>
-<form method="post">
-    {% if users %}
-    <div class="form-group">
-        <label>المستخدم</label>
-        <select class="form-control" name="user_id" required>
-            {% for u in users %}
-            <option value="{{ u.id }}" {% if u.id == entry.user_id %}selected{% endif %}>{{ u.username }}</option>
-            {% endfor %}
-        </select>
+<div class="card-section">
+  <div class="page-title mb-3">
+    <div class="page-summary">
+      <h2>تعديل الحصة</h2>
+      <p>حدّث اليوم أو الفترة أو المقرر مع التأكد من عدم وجود تعارض في القاعة أو المدرس.</p>
     </div>
-    {% endif %}
-    <div class="form-group"><label>اليوم</label>
-        <select class="form-control" name="day" required>
-            <option value="الأحد" {% if 'الأحد' == entry.day %}selected{% endif %}>الأحد</option>
-            <option value="الاثنين" {% if 'الاثنين' == entry.day %}selected{% endif %}>الاثنين</option>
-            <option value="الثلاثاء" {% if 'الثلاثاء' == entry.day %}selected{% endif %}>الثلاثاء</option>
-            <option value="الأربعاء" {% if 'الأربعاء' == entry.day %}selected{% endif %}>الأربعاء</option>
-            <option value="الخميس" {% if 'الخميس' == entry.day %}selected{% endif %}>الخميس</option>
+    <a href="{{ url_for('timetable.list_timetable') }}" class="btn btn-outline-secondary">العودة إلى الجدول</a>
+  </div>
+
+  <form method="post" id="edit-timetable-form">
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="day">اليوم</label>
+        <select class="form-control" name="day" id="day" required>
+          {% for day in days %}
+          <option value="{{ day }}" {% if day == entry.day %}selected{% endif %}>{{ day }}</option>
+          {% endfor %}
         </select>
-    </div>
-    <div class="form-group"><label>الفصل الدراسي</label>
-        <select class="form-control" name="semester" required>
-            <option value="1" {% if entry.semester == 1 %}selected{% endif %}>1</option>
-            <option value="2" {% if entry.semester == 2 %}selected{% endif %}>2</option>
+      </div>
+
+      <div class="form-group">
+        <label for="semester">الفصل الدراسي</label>
+        <select class="form-control" name="semester" id="semester" required>
+          {% for sem in range(1, 8) %}
+          <option value="{{ sem }}" {% if sem == entry.semester %}selected{% endif %}>الفصل {{ sem }}</option>
+          {% endfor %}
         </select>
-    </div>
-    <div class="form-group"><label>الشعبة</label>
-        <select class="form-control" name="section" required>
-            <option value="A" {% if entry.section == 'A' %}selected{% endif %}>A</option>
-            <option value="B" {% if entry.section == 'B' %}selected{% endif %}>B</option>
+      </div>
+
+      <div class="form-group">
+        <label for="period">الفترة</label>
+        <select class="form-control" name="section" id="period" required>
+          {% for period in enabled_periods %}
+          <option value="{{ period.code }}" {% if period.code == entry.section %}selected{% endif %}>{{ period.label }} — {{ period.start_time }} حتى {{ period.end_time }}</option>
+          {% endfor %}
         </select>
-    </div>
-    <div class="form-group"><label>المادة</label>
+      </div>
+
+      <div class="form-group">
+        <label for="course_id">المقرر</label>
         <select class="form-control" name="course_id" required>
-            {% for c in courses %}
-            <option value="{{ c.id }}" {% if c.id == entry.course_id %}selected{% endif %}>{{ c.name }}</option>
-            {% endfor %}
+          {% for c in courses %}
+          <option value="{{ c.id }}" {% if c.id == entry.course_id %}selected{% endif %}>{{ c.name }} — {{ c.code }}</option>
+          {% endfor %}
         </select>
-    </div>
-    <div class="form-group"><label>المدرس</label>
-        <select class="form-control" name="teacher_id" required>
-            {% for t in teachers %}
-            <option value="{{ t.id }}" {% if t.id == entry.teacher_id %}selected{% endif %}>{{ t.name }}</option>
-            {% endfor %}
+      </div>
+
+      <div class="form-group">
+        <label for="teacher_id">المدرس</label>
+        <select class="form-control" name="teacher_id" id="teacher_id" required>
+          {% for t in available_teachers %}
+          <option value="{{ t.id }}" {% if t.id == entry.teacher_id %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
         </select>
-    </div>
-    <div class="form-group"><label>القاعة</label>
-        <select class="form-control" name="room_id" required>
-            {% for r in rooms %}
-            <option value="{{ r.id }}" {% if r.id == entry.room_id %}selected{% endif %} {% if r.status == 'غير متاحة' %}disabled{% endif %} {% if r.status == 'مقفلة' and session.role != 'super_admin' %}style="display:none;"{% endif %}>
-                {{ r.name_ar or r.name }} ({{ r.type }})
-            </option>
-            {% endfor %}
+      </div>
+
+      <div class="form-group full">
+        <label for="room_id">القاعة</label>
+        <select class="form-control" name="room_id" id="room_id" required>
+          {% for r in available_rooms %}
+          <option value="{{ r.id }}" {% if not r.is_available and r.id != entry.room_id %}disabled{% endif %} {% if r.id == entry.room_id %}selected{% endif %}>
+            {{ r.name_ar or r.name }}{% if not r.is_available and r.id != entry.room_id %} - محجوزة{% endif %}
+          </option>
+          {% endfor %}
         </select>
+        <small class="small-note">تُعرض كل القاعات، وتُعطل فقط القاعة المحجوزة في نفس الفترة.</small>
+      </div>
     </div>
-    <button class="btn btn-primary" type="submit">حفظ</button>
-</form>
+
+    <div class="form-actions mt-3">
+      <button class="btn btn-primary" type="submit" id="submitBtn">حفظ التعديلات</button>
+    </div>
+  </form>
+</div>
+
+<script>
+  window.allCourses = {{ courses|tojson|safe }};
+  window.allTeachers = {{ teachers|tojson|safe }};
+  window.entryId = '{{ entry.id }}';
+  window.originalRoomId = '{{ entry.room_id }}';
+  window.originalTeacherId = '{{ entry.teacher_id }}';
+  window.originalCourseId = '{{ entry.course_id }}';
+</script>
+<script src="{{ url_for('static', filename='js/timetable.js') }}"></script>
 {% endblock %}

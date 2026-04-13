@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>إضافة طالب</h2>
+<form method="post">
+    <div class="form-group">
+        <label>Name</label>
+        <input class="form-control" name="name" required>
+    </div>
+    <div class="form-group">
+        <label>Department</label>
+        <input class="form-control" name="department" required>
+    </div>
+    <div class="form-group">
+        <label>Class</label>
+        <input class="form-control" name="class" required>
+    </div>
+    <button class="btn btn-success" type="submit">حفظ</button>
+    <a href="{{ url_for('students.list_students') }}" class="btn btn-secondary">إلغاء</a>
+</form>
+{% endblock %}

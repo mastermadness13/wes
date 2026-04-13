@@ -1,13 +1,14 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 import db
 
-from routes import login_required
+from routes import login_required, super_admin_required
 
 students_bp = Blueprint('students', __name__)
 
 
 @students_bp.route('/')
 @login_required
+@super_admin_required
 def list_students():
     conn = db.get_db()
     department = request.args.get('department', '')
@@ -33,6 +34,7 @@ def list_students():
 
 @students_bp.route('/create', methods=['GET', 'POST'])
 @login_required
+@super_admin_required
 def create_student():
     if request.method == 'POST':
         name = request.form['name']
@@ -53,6 +55,7 @@ def create_student():
 
 @students_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
+@super_admin_required
 def edit_student(id):
     conn = db.get_db()
     student = conn.execute('SELECT * FROM students WHERE id = ?', (id,)).fetchone()
@@ -77,6 +80,7 @@ def edit_student(id):
 
 @students_bp.route('/<int:id>/delete', methods=['POST'])
 @login_required
+@super_admin_required
 def delete_student(id):
     conn = db.get_db()
     student = conn.execute('SELECT * FROM students WHERE id = ?', (id,)).fetchone()

@@ -1,9 +1,788 @@
-body.dark { background: #121212; color: #f5f5f5; }
-body.dark .navbar { background-color: #1f1f1f !important; }
-body.dark .card, body.dark .table { background: #1e1e1e; color: #f5f5f5; }
-body.light { background: #ffffff; color: #000000; }
+﻿:root {
+  --bg: #eef3f8;
+  --bg-accent: radial-gradient(circle at top left, rgba(79, 134, 247, 0.14), transparent 36%), radial-gradient(circle at top right, rgba(16, 185, 129, 0.11), transparent 28%), #eef3f8;
+  --text: #132033;
+  --muted: #66758c;
+  --surface: #ffffff;
+  --surface-2: #f5f8fc;
+  --border: #d8e0ea;
+  --border-strong: #c3cedd;
+  --accent: #1457d2;
+  --accent-2: #0f9a6a;
+  --accent-contrast: #ffffff;
+  --shadow: 0 14px 35px rgba(15, 23, 42, 0.08);
+  --shadow-soft: 0 8px 22px rgba(15, 23, 42, 0.06);
+}
+
+body.dark {
+  --bg: #0f172a;
+  --bg-accent: radial-gradient(circle at top left, rgba(59, 130, 246, 0.18), transparent 36%), radial-gradient(circle at top right, rgba(16, 185, 129, 0.12), transparent 28%), #0f172a;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --surface: #16213a;
+  --surface-2: #1f2a44;
+  --border: #31405c;
+  --border-strong: #425476;
+  --accent: #4f8df7;
+  --accent-2: #22c55e;
+  --accent-contrast: #ffffff;
+  --shadow: 0 16px 34px rgba(0, 0, 0, 0.28);
+  --shadow-soft: 0 10px 20px rgba(0, 0, 0, 0.22);
+}
+
+body.colorful {
+  --bg: #f2f4ff;
+  --bg-accent: radial-gradient(circle at top left, rgba(99, 102, 241, 0.15), transparent 35%), radial-gradient(circle at bottom right, rgba(244, 114, 182, 0.14), transparent 34%), #f2f4ff;
+  --text: #132033;
+  --muted: #5d687b;
+  --surface: rgba(255, 255, 255, 0.97);
+  --surface-2: #f4f6ff;
+  --border: #d8def2;
+  --border-strong: #c4cbe9;
+  --accent: #6d28d9;
+  --accent-2: #ea580c;
+  --accent-contrast: #ffffff;
+  --shadow: 0 16px 34px rgba(109, 40, 217, 0.16);
+  --shadow-soft: 0 10px 20px rgba(109, 40, 217, 0.1);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg-accent);
+  color: var(--text);
+  font-family: 'Tajawal', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
 body.font-small { font-size: 12px; }
 body.font-medium { font-size: 16px; }
-body.font-large { font-size: 20px; }
-.btn { margin: 2px; }
-.rtl { direction: rtl; text-align: right; }
+body.font-large { font-size: 18px; }
+
+.rtl {
+  direction: rtl;
+  text-align: right;
+}
+
+.container {
+  max-width: 1320px;
+}
+
+.app-navbar {
+  box-shadow: var(--shadow-soft);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.brand-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.brand-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.role-badge {
+  font-weight: 700;
+}
+
+.navbar .nav-link,
+.navbar .dropdown-item {
+  font-weight: 600;
+}
+
+.navbar .dropdown-menu {
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.page-card,
+.card-section,
+.table-card,
+.timetable-card,
+.courses-card,
+.course-form-card,
+.history-card,
+.summary-card,
+.panel-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+}
+
+.page-card,
+.card-section,
+.courses-card,
+.timetable-card,
+.history-card,
+.panel-card {
+  padding: 1.35rem 1.45rem;
+}
+
+.page-title,
+.section-header,
+.table-head,
+.schedule-banner,
+.course-form-head,
+.history-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.page-title h2,
+.page-title h3,
+.section-header h2,
+.section-header h3,
+.table-head h2,
+.table-head h3,
+.schedule-banner h2,
+.schedule-banner h3,
+.course-form-head h2,
+.history-head h2 {
+  margin-bottom: 0.3rem;
+}
+
+.page-title p,
+.section-header p,
+.schedule-subtitle,
+.course-meta,
+.helper-text,
+.text-muted,
+.history-summary {
+  color: var(--muted) !important;
+}
+
+.action-group,
+.courses-actions,
+.timetable-actions,
+.history-actions,
+.form-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.btn {
+  border-radius: 999px;
+  font-weight: 600;
+  padding: 0.55rem 1rem;
+  border-width: 1px;
+  box-shadow: none !important;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), #4a84f0);
+  border-color: transparent;
+}
+
+.btn-success {
+  background: linear-gradient(135deg, var(--accent-2), #16a34a);
+  border-color: transparent;
+}
+
+.btn-outline-primary {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn-outline-secondary,
+.btn-secondary {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: transparent;
+}
+
+.btn-danger,
+.btn-outline-danger {
+  border-color: #ef4444;
+}
+
+.btn:hover,
+.btn:focus {
+  transform: translateY(-1px);
+}
+
+.form-control,
+.form-select,
+.custom-select {
+  min-height: 46px;
+  border-radius: 14px;
+  border-color: var(--border-strong);
+  background-color: var(--surface);
+  color: var(--text);
+}
+
+.form-control:focus,
+.form-select:focus,
+.custom-select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 0.18rem rgba(20, 87, 210, 0.16);
+}
+
+label {
+  font-weight: 700;
+  margin-bottom: 0.45rem;
+}
+
+.form-grid,
+.courses-tool-grid,
+.timetable-filters,
+.filters-grid,
+.import-grid,
+.history-filters,
+.dashboard-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-grid .full,
+.import-grid .full,
+.history-filters .full {
+  grid-column: 1 / -1;
+}
+
+.timetable-filters,
+.filters-grid,
+.history-filters {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+}
+
+.courses-tool-grid,
+.import-grid {
+  grid-template-columns: 1.15fr 0.95fr;
+}
+
+.table-card,
+.table-responsive {
+  overflow: hidden;
+}
+
+.table {
+  margin-bottom: 0;
+  color: inherit;
+}
+
+.table thead th {
+  background: var(--surface-2);
+  border-color: var(--border);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.table td,
+.table th {
+  border-color: var(--border);
+  vertical-align: middle;
+}
+
+.table-hover tbody tr:hover {
+  background-color: rgba(20, 87, 210, 0.04);
+}
+
+.badge-soft,
+.status-pill,
+.count-badge,
+.metric-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-weight: 700;
+  background: rgba(20, 87, 210, 0.08);
+  color: var(--accent);
+}
+
+.count-badge {
+  background: rgba(15, 154, 106, 0.12);
+  color: var(--accent-2);
+}
+
+.info-box,
+.import-hint,
+.filter-panel,
+.notice-panel,
+.note-panel,
+.history-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 1rem 1.1rem;
+}
+
+.helper-list,
+.guideline-list {
+  margin: 0.75rem 0 0;
+  padding-inline-start: 1.15rem;
+  color: var(--muted);
+}
+
+.courses-page,
+.timetable-layout,
+.history-page {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.courses-toolbar,
+.timetable-toolbar,
+.history-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.search-input {
+  max-width: 360px;
+}
+
+.courses-table-wrap,
+.history-table-wrap,
+.timetable-table-wrap {
+  overflow: auto;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+}
+
+.courses-table,
+.timetable-print-table,
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.courses-table th,
+.courses-table td,
+.timetable-print-table th,
+.timetable-print-table td,
+.history-table th,
+.history-table td {
+  padding: 0.9rem 0.85rem;
+  border: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.courses-table th,
+.timetable-print-table th,
+.history-table th {
+  background: var(--surface-2);
+}
+
+.course-row,
+.history-row,
+.schedule-item {
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.course-row:hover,
+.history-row:hover,
+.schedule-item:hover {
+  background: rgba(20, 87, 210, 0.03);
+}
+
+.course-row.active-row {
+  background: rgba(20, 87, 210, 0.05);
+}
+
+.row-actions {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.action-trigger {
+  min-width: 3rem;
+  border-radius: 999px;
+}
+
+.action-menu {
+  position: absolute;
+  inset-inline-end: 0;
+  top: calc(100% + 0.45rem);
+  min-width: 170px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(6px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 20;
+}
+
+.row-actions.active .action-menu,
+.row-actions:hover .action-menu,
+.course-row.active-row .action-menu {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.action-link,
+.row-actions form button {
+  display: block;
+  width: 100%;
+  padding: 0.8rem 1rem;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  text-align: right;
+}
+
+.action-link:hover,
+.row-actions form button:hover {
+  background: rgba(20, 87, 210, 0.08);
+}
+
+.timetable-summary,
+.page-summary {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.timetable-summary .summary-line {
+  display: inline-flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  color: var(--muted);
+}
+
+.semester-stack,
+.stack-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.timetable-period-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.period-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 1rem;
+}
+
+.schedule-item {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 0.95rem;
+  background: var(--surface-2);
+  min-height: 120px;
+  display: grid;
+  gap: 0.35rem;
+  position: relative;
+}
+
+.schedule-course {
+  font-weight: 700;
+  font-size: 1.02rem;
+}
+
+.schedule-room,
+.schedule-owner,
+.schedule-teacher {
+  color: var(--muted);
+}
+
+.schedule-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.45rem;
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: opacity 0.2s ease, max-height 0.2s ease;
+}
+
+.schedule-item.active .schedule-actions,
+.schedule-item:hover .schedule-actions {
+  opacity: 1;
+  max-height: 80px;
+}
+
+.empty-cell {
+  min-height: 120px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: background 0.2s ease;
+}
+
+.empty-cell:hover {
+  background: rgba(20, 87, 210, 0.05);
+}
+
+.day-col {
+  width: 115px;
+  min-width: 115px;
+}
+
+.day-label {
+  font-weight: 700;
+  line-height: 1;
+  white-space: normal;
+}
+
+.print-header {
+  display: none;
+}
+
+.tooltip {
+  position: relative;
+  display: inline-flex;
+}
+
+.tooltip .tooltiptext {
+  visibility: hidden;
+  min-width: 180px;
+  max-width: 240px;
+  background-color: var(--surface);
+  color: var(--text);
+  text-align: center;
+  border-radius: 10px;
+  padding: 0.45rem 0.75rem;
+  position: absolute;
+  z-index: 2;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  white-space: normal;
+}
+
+.tooltip:hover .tooltiptext {
+  visibility: visible;
+  opacity: 1;
+}
+
+.code-helper,
+.small-note,
+.note-text,
+.filter-caption {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.courses-hero,
+.courses-tools,
+.timetable-filter-card,
+.history-filter-card,
+.summary-card {
+  padding: 1.35rem 1.45rem;
+}
+
+.history-table code,
+.history-table pre,
+.history-table .raw-value {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.badge-stack {
+  display: inline-flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.auth-shell,
+.user-form-shell,
+.course-form-shell {
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.auth-card,
+.user-form-card,
+.course-form-card {
+  padding: 1.5rem;
+}
+
+.mini-grid {
+  display: grid;
+  gap: 0.8rem;
+}
+
+@media (max-width: 991px) {
+  .courses-tool-grid,
+  .import-grid,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-card,
+  .card-section,
+  .courses-card,
+  .timetable-card,
+  .history-card,
+  .panel-card,
+  .course-form-card {
+    padding: 1.1rem;
+  }
+
+  .search-input {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 767px) {
+  .page-title,
+  .section-header,
+  .table-head,
+  .schedule-banner,
+  .course-form-head,
+  .history-head,
+  .timetable-toolbar,
+  .courses-toolbar,
+  .history-toolbar {
+    align-items: stretch;
+  }
+
+  .action-group,
+  .courses-actions,
+  .timetable-actions,
+  .history-actions,
+  .form-actions {
+    width: 100%;
+  }
+
+  .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .day-col {
+    width: 92px;
+    min-width: 92px;
+  }
+}
+
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  .print-area,
+  .print-area * {
+    visibility: visible !important;
+  }
+
+  .print-area {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+  }
+
+  .no-print,
+  .navbar,
+  .app-navbar,
+  .dropdown-menu,
+  .alert,
+  .tooltip,
+  .btn,
+  .action-group,
+  .courses-actions,
+  .timetable-actions,
+  .history-actions,
+  .row-actions,
+  .action-trigger,
+  .action-menu,
+  .form-control,
+  .form-select,
+  .custom-select,
+  .filter-panel,
+  .summary-card,
+  .card-section,
+  .page-card:not(.print-area),
+  .courses-card:not(.print-area),
+  .timetable-card:not(.print-area),
+  .history-card:not(.print-area) {
+    display: none !important;
+  }
+
+  .print-header {
+    display: block !important;
+    margin-bottom: 1rem;
+    text-align: center;
+  }
+
+  .timetable-print-table,
+  .courses-table,
+  .history-table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  .timetable-print-table th,
+  .timetable-print-table td,
+  .courses-table th,
+  .courses-table td,
+  .history-table th,
+  .history-table td {
+    border: 1px solid #000 !important;
+    color: #000 !important;
+    background: #fff !important;
+    padding: 0.65rem !important;
+  }
+
+  .schedule-item,
+  .empty-cell {
+    border: 0 !important;
+    background: #fff !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+  }
+
+  .metadata-only,
+  .course-meta,
+  .schedule-owner,
+  .schedule-room,
+  .schedule-teacher,
+  .text-muted {
+    color: #000 !important;
+  }
+}

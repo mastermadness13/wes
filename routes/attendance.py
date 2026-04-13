@@ -1,13 +1,14 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 import db
 
-from routes import login_required
+from routes import login_required, super_admin_required
 
 attendance_bp = Blueprint('attendance', __name__)
 
 
 @attendance_bp.route('/')
 @login_required
+@super_admin_required
 def list_attendance():
     conn = db.get_db()
     student_id = request.args.get('student_id', '')
@@ -30,19 +31,28 @@ def list_attendance():
 
 @attendance_bp.route('/create', methods=['GET', 'POST'])
 @login_required
+@super_admin_required
 def create_attendance():
     conn = db.get_db()
     students = conn.execute('SELECT * FROM students WHERE user_id = ?' if session.get('role')!='super_admin' else 'SELECT * FROM students',
                              (session['user_id'],) if session.get('role')!='super_admin' else ()).fetchall()
 
     if request.method == 'POST':
-        student_id = request.form['student_id']
+        student_id = int(request.form['student_id'])
         date = request.form['date']
         status = request.form['status']
         note = request.form.get('note', '')
+        student = conn.execute('SELECT * FROM students WHERE id = ?', (student_id,)).fetchone()
+        if not student:
+            flash('Student not found.', 'danger')
+            return redirect(url_for('attendance.create_attendance'))
+        if session.get('role') != 'super_admin' and student['user_id'] != session['user_id']:
+            flash('Not allowed.', 'danger')
+            return redirect(url_for('attendance.create_attendance'))
+        owner_user_id = student['user_id']
 
         conn.execute('INSERT INTO attendance (user_id, student_id, date, status, note) VALUES (?, ?, ?, ?, ?)',
-                     (session['user_id'], student_id, date, status, note))
+                     (owner_user_id, student_id, date, status, note))
         conn.commit()
         flash('تم تسجيل الحضور', 'success')
         return redirect(url_for('attendance.list_attendance'))
@@ -52,6 +62,7 @@ def create_attendance():
 
 @attendance_bp.route('/<int:id>/delete', methods=['POST'])
 @login_required
+@super_admin_required
 def delete_attendance(id):
     conn = db.get_db()
     record = conn.execute('SELECT * FROM attendance WHERE id = ?', (id,)).fetchone()

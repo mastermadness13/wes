@@ -1,10 +1,67 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 {% block content %}
-<h2>تعديل مادة</h2>
-<form method="post">
-    <div class="form-group"><label>الاسم</label><input value="{{ course.name }}" class="form-control" name="name" required></div>
-    <div class="form-group"><label>الكود</label><input value="{{ course.code }}" class="form-control" name="code" required></div>
-    <div class="form-group"><label>القسم</label><input value="{{ course.department }}" class="form-control" name="department" required></div>
-    <button class="btn btn-primary" type="submit">تحديث</button>
-</form>
+<div class="course-form-shell">
+  <div class="course-form-card bg-white">
+    <div class="course-form-head">
+      <div>
+        <h2 class="mb-1">تعديل المادة</h2>
+        <div class="text-muted">يمكنك تحديث بيانات المادة أو إنشاء رمز جديد متوافق مع القسم والسنة.</div>
+      </div>
+      <a href="{{ url_for('courses.list_courses') }}" class="btn btn-outline-secondary">العودة إلى قائمة المواد</a>
+    </div>
+
+    <div class="course-form-body">
+      <form method="post">
+        <div class="course-grid">
+          <div class="form-group full">
+            <label for="name">اسم المادة</label>
+            <input id="name" class="form-control" name="name" value="{{ form_data.name }}" required>
+          </div>
+
+          <div class="form-group">
+            <label for="department">القسم</label>
+            <select id="department" class="form-control" name="department" required>
+              <option value="">اختر القسم</option>
+              {% for d in departments %}
+              <option value="{{ d.name }}" {% if d.name == form_data.department %}selected{% endif %}>{{ d.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="year">السنة الدراسية</label>
+            <select id="year" class="form-control" name="year" required>
+              {% for option in [1, 2, 3, 4] %}
+              <option value="{{ option }}" {% if form_data.year|string == option|string %}selected{% endif %}>السنة {{ option }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group full">
+            <label for="code">رمز المادة</label>
+            <div class="code-row">
+              <input id="code" class="form-control" name="code" value="{{ form_data.code }}" placeholder="هـ101" required>
+              <button class="btn btn-outline-primary" type="button" id="generateCodeBtn">اقتراح رمز تلقائي</button>
+            </div>
+            <div class="code-helper">مثال: هـ101 أو ت205 أو ع102.</div>
+          </div>
+
+          <div class="form-group full">
+            <label for="notes">الملاحظات</label>
+            <textarea id="notes" class="form-control" name="notes" rows="4" placeholder="ملاحظات اختيارية">{{ form_data.notes }}</textarea>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button class="btn btn-primary px-4" type="submit">تحديث المادة</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.courseId = '{{ course.id }}';
+</script>
+<script src="{{ url_for('static', filename='js/courses.js') }}"></script>
 {% endblock %}

@@ -18,12 +18,13 @@ def index():
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
+        username = request.form['username'].strip()
         password = request.form['password']
 
         conn = db.get_db()
         user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
         if user and check_password_hash(user['password'], password):
+            session.clear()
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['role'] = user['role']
@@ -77,10 +78,11 @@ def dashboard():
         admins = conn.execute('SELECT username FROM users WHERE role = "admin"').fetchall()
         # Today lectures
         today_lectures = conn.execute('''
-            SELECT t.*, c.name as course_name, te.name as teacher_name, t.room as room_name
+            SELECT t.*, c.name as course_name, te.name as teacher_name, r.name as room_name
             FROM timetable t
             JOIN courses c ON t.course_id = c.id
             JOIN teachers te ON t.teacher_id = te.id
+            LEFT JOIN rooms r ON t.room_id = r.id
             WHERE t.day = ?
         ''', (current_day,)).fetchall()
         recent_activity = conn.execute('''
@@ -100,10 +102,11 @@ def dashboard():
         }
         # Today lectures for user
         today_lectures = conn.execute('''
-            SELECT t.*, c.name as course_name, te.name as teacher_name, t.room as room_name
+            SELECT t.*, c.name as course_name, te.name as teacher_name, r.name as room_name
             FROM timetable t
             JOIN courses c ON t.course_id = c.id
             JOIN teachers te ON t.teacher_id = te.id
+            LEFT JOIN rooms r ON t.room_id = r.id
             WHERE t.user_id = ? AND t.day = ?
         ''', (session['user_id'], current_day)).fetchall()
         recent_activity = conn.execute('''

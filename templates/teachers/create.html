@@ -2,9 +2,25 @@
 {% block content %}
 <h2>إضافة مدرس</h2>
 <form method="post">
-    <div class="form-group"><label>الاسم</label><input class="form-control" name="name" required></div>
-    <div class="form-group"><label>القسم</label><input class="form-control" name="department" required></div>
-    <div class="form-group"><label>المادة</label><input class="form-control" name="subject" required></div>
+    <div class="form-group"><label>Name</label><input class="form-control" name="name" required></div>
+    <div class="form-group">
+        <label>Department</label>
+        <select class="form-control" name="department" required>
+            <option value="">Select department</option>
+            {% for d in departments %}
+            <option value="{{ d.name }}">{{ d.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Subject</label>
+        <select class="form-control" name="subject" required>
+            <option value="">Select subject</option>
+            {% for s in subjects %}
+            <option value="{{ s.name }}">{{ s.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
     <button class="btn btn-success" type="submit">حفظ</button>
 </form>
 {% endblock %}

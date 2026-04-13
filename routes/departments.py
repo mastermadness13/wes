@@ -1,13 +1,14 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 import db
 
-from routes import login_required
+from routes import login_required, super_admin_required
 
 departments_bp = Blueprint('departments', __name__)
 
 
 @departments_bp.route('/')
 @login_required
+@super_admin_required
 def list_departments():
     conn = db.get_db()
     if session.get('role') == 'super_admin':
@@ -23,6 +24,7 @@ def list_departments():
 
 @departments_bp.route('/create', methods=['POST'])
 @login_required
+@super_admin_required
 def create_department():
     name = request.form['name']
     semesters = int(request.form['semesters'])
@@ -41,6 +43,7 @@ def create_department():
 
 @departments_bp.route('/<int:id>/edit', methods=['POST'])
 @login_required
+@super_admin_required
 def edit_department(id):
     name = request.form['name']
     semesters = int(request.form['semesters'])
@@ -56,6 +59,7 @@ def edit_department(id):
 
 @departments_bp.route('/<int:id>/delete', methods=['POST'])
 @login_required
+@super_admin_required
 def delete_department(id):
     conn = db.get_db()
     conn.execute('DELETE FROM departments WHERE id = ?', (id,))
