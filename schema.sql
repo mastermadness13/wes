@@ -1,4 +1,4 @@
-﻿PRAGMA foreign_keys = ON;
+﻿﻿PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS courses (
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_courses_user_id ON courses(user_id);
+CREATE INDEX IF NOT EXISTS idx_courses_department ON courses(department);
 
 CREATE TABLE IF NOT EXISTS timetable (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,6 +79,7 @@ CREATE TABLE IF NOT EXISTS rooms (
     type TEXT CHECK(type IN ('قاعة', 'معمل', 'مسرح')) DEFAULT 'قاعة',
     status TEXT CHECK(status IN ('متاحة', 'غير متاحة', 'مقفلة')) DEFAULT 'متاحة',
     capacity INTEGER,
+    devices INTEGER DEFAULT 0,
     location TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
