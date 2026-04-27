@@ -50,8 +50,11 @@ def create_user():
 
 @users_bp.route('/<int:user_id>/edit', methods=['GET', 'POST'])
 @login_required
-@super_admin_required
 def edit_user(user_id):
+    # فقط super_admin أو المستخدم نفسه يمكنه التعديل
+    if session.get('role') != 'super_admin' and session.get('user_id') != user_id:
+        flash('ليس لديك صلاحية تعديل هذا المستخدم.', 'danger')
+        return redirect(url_for('auth.dashboard'))
     conn = db.get_db()
     user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
     if not user:
@@ -60,26 +63,29 @@ def edit_user(user_id):
 
     if request.method == 'POST':
         username = request.form['username'].strip()
-        role = request.form['role']
         label = request.form['label'].strip()
-        allowed_roles = {'admin', 'super_admin'}
-        if role not in allowed_roles:
-            flash('Invalid role selected.', 'danger')
-            return render_template('users/edit.html', user=user)
-        if user['role'] == 'super_admin' and role != 'super_admin':
-            super_admin_count = conn.execute(
-                'SELECT COUNT(*) FROM users WHERE role = "super_admin"'
-            ).fetchone()[0]
-            if super_admin_count <= 1:
-                flash('Cannot demote the last super admin.', 'danger')
+        if session.get('role') == 'super_admin':
+            role = request.form['role']
+            allowed_roles = {'admin', 'super_admin'}
+            if role not in allowed_roles:
+                flash('Invalid role selected.', 'danger')
                 return render_template('users/edit.html', user=user)
-
-        conn.execute('UPDATE users SET username=?, role=?, label=? WHERE id=?',
-                     (username, role, label, user_id))
+            if user['role'] == 'super_admin' and role != 'super_admin':
+                super_admin_count = conn.execute(
+                    'SELECT COUNT(*) FROM users WHERE role = "super_admin"'
+                ).fetchone()[0]
+                if super_admin_count <= 1:
+                    flash('Cannot demote the last super admin.', 'danger')
+                    return render_template('users/edit.html', user=user)
+            conn.execute('UPDATE users SET username=?, role=?, label=? WHERE id=?',
+                         (username, role, label, user_id))
+        else:
+            # Admin يعدل اسمه و label فقط
+            conn.execute('UPDATE users SET username=?, label=? WHERE id=?',
+                         (username, label, user_id))
         conn.commit()
         flash('تم تحديث بيانات المستخدم', 'success')
-        return redirect(url_for('users.list_users'))
-
+        return redirect(url_for('auth.dashboard'))
     return render_template('users/edit.html', user=user)
 
 
@@ -111,8 +117,11 @@ def delete_user(user_id):
 
 @users_bp.route('/<int:user_id>/change_password', methods=['GET', 'POST'])
 @login_required
-@super_admin_required
 def change_password(user_id):
+    # فقط super_admin أو المستخدم نفسه يمكنه تغيير كلمة المرور
+    if session.get('role') != 'super_admin' and session.get('user_id') != user_id:
+        flash('ليس لديك صلاحية تغيير كلمة المرور لهذا المستخدم.', 'danger')
+        return redirect(url_for('auth.dashboard'))
     conn = db.get_db()
     user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
     if not user:

@@ -3,6 +3,9 @@
 <div class="container mt-4">
     <h2>إضافة قاعة</h2>
     <form method="post">
+        {% if csrf_token %}
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {% endif %}
         <div class="form-group">
             <label>اسم القاعة (إنجليزي)</label>
             <input type="text" class="form-control" name="name" required>
@@ -24,6 +27,8 @@
             <select class="form-control" name="status" required>
                 <option value="متاحة">متاحة</option>
                 <option value="غير متاحة">غير متاحة</option>
+                <option value="مستخدمة">مستخدمة</option>
+                <option value="صيانة">صيانة</option>
                 <option value="مقفلة">مقفلة</option>
             </select>
         </div>
@@ -32,8 +37,18 @@
             <input type="number" class="form-control" name="capacity">
         </div>
         <div class="form-group">
+            <label>الأجهزة</label>
+            <input type="number" class="form-control" name="devices">
+        </div>
+        <div class="form-group">
             <label>الموقع</label>
-            <input type="text" class="form-control" name="location">
+            <select class="form-control" name="location" required>
+                <option value="الدور الأرضي">الدور الأرضي</option>
+                <option value="الدور الأول">الدور الأول</option>
+                <option value="الدور الثاني">الدور الثاني</option>
+                <option value="الدور الثالث">الدور الثالث</option>
+                <option value="الدور الرابع">الدور الرابع</option>
+            </select>
         </div>
         <button type="submit" class="btn btn-primary">حفظ</button>
         <a href="{{ url_for('rooms.list_rooms') }}" class="btn btn-secondary">إلغاء</a>

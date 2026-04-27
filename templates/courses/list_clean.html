@@ -1,0 +1,197 @@
+{% extends 'base.html' %}
+{% block content %}
+{% set current_view = request.full_path.rstrip('?') %}
+<div class="courses-page">
+  <section class="page-card courses-hero no-print">
+    <div class="page-title">
+      <div class="page-summary" data-once-hint="courses-hero-summary">
+        <h2>المقررات</h2>
+        <p>إدارة المقررات من مكان واحد مع بحث سريع وفلترة حسب القسم والسنة، دون عرض أي بيانات غير موجودة فعليًا.</p>
+      </div>
+      <div class="courses-actions">
+        <a href="{{ url_for('courses.create_course') }}" class="btn btn-success">إضافة مقرر</a>
+        <a href="{{ url_for('courses.download_courses_excel') }}" class="btn btn-outline-primary">تنزيل Excel</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-card courses-tools no-print">
+    <div class="courses-tool-grid">
+      <div class="import-panel">
+        <div class="section-header mb-3" data-once-hint="courses-import-header">
+          <div>
+            <h3>استيراد Excel</h3>
+            <p class="mb-0">ارفع ملف `.xlsx` مطابقًا للأعمدة الرسمية فقط.</p>
+          </div>
+        </div>
+        <form method="post" action="{{ url_for('courses.upload_courses_excel') }}" enctype="multipart/form-data" class="mini-grid">
+          <input type="hidden" name="next" value="{{ current_view }}">
+          <div class="form-group mb-0">
+            <label for="excel_file">ملف Excel</label>
+            <input id="excel_file" type="file" class="form-control-file" name="excel_file" accept=".xlsx" required>
+          </div>
+          <div>
+            <button class="btn btn-primary" type="submit">رفع الملف</button>
+          </div>
+        </form>
+        <div class="import-hint mt-3" data-once-hint="courses-import-format">
+          <strong>الأعمدة المطلوبة:</strong>
+          <ul class="helper-list">
+            <li>رمز المادة</li>
+            <li>اسم المادة</li>
+            <li>القسم</li>
+            <li>السنة</li>
+            <li>الملاحظات</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="filter-panel">
+        <div class="section-header mb-3">
+          <div>
+            <h3>البحث والفلترة</h3>
+            <p class="mb-0">ابحث بالاسم أو الكود، ثم صفِّ النتائج حسب القسم والسنة.</p>
+          </div>
+        </div>
+        <form method="get" class="mini-grid">
+          <div class="form-group mb-0">
+            <label for="courseSearchQuery">بحث</label>
+            <input id="courseSearchQuery" type="search" class="form-control" name="q" value="{{ search }}" placeholder="مثال: ه101 أو ميكانيكا موائع">
+          </div>
+          <div class="form-group mb-0">
+            <label for="departmentFilter">القسم</label>
+            <select id="departmentFilter" class="form-control" name="department">
+              <option value="">كل الأقسام</option>
+              {% for d in departments %}
+              <option value="{{ d.name }}" {% if d.name == department %}selected{% endif %}>{{ d.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group mb-0">
+            <label for="yearFilter">السنة</label>
+            <select id="yearFilter" class="form-control" name="year">
+              <option value="">كل السنوات</option>
+              {% for option in [1, 2, 3, 4] %}
+              <option value="{{ option }}" {% if selected_year|string == option|string %}selected{% endif %}>السنة {{ option }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-primary" type="submit">تطبيق</button>
+            <a href="{{ url_for('courses.list_courses') }}" class="btn btn-outline-secondary">إعادة الضبط</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="page-card print-area">
+    <div class="table-head mb-3 no-print">
+      <div>
+        <h3 class="mb-1">قائمة المقررات</h3>
+        <p class="mb-0">عدد النتائج الحالية: <span class="count-badge">{{ courses|length }}</span></p>
+      </div>
+    </div>
+
+    <div class="courses-table-wrap">
+      <table class="table courses-table text-center" id="coursesTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>الرمز</th>
+            <th>اسم المقرر</th>
+            <th>القسم</th>
+            <th>السنة</th>
+            <th>الملاحظات</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in courses %}
+          <tr
+            class="course-row"
+            tabindex="0"
+            data-course-id="{{ c.id }}"
+            data-course-name="{{ c.name }}"
+            data-course-code="{{ c.code }}"
+            data-course-department="{{ c.department }}"
+            data-course-year="{{ c.year }}"
+            data-course-notes="{{ c.notes or '' }}"
+          >
+            <td>{{ loop.index }}</td>
+            <td><strong>{{ c.code }}</strong></td>
+            <td>{{ c.name }}</td>
+            <td>{{ c.department }}</td>
+            <td>السنة {{ c.year }}</td>
+            <td>{{ c.notes or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="text-center py-4 text-muted">لا توجد مقررات مطابقة للفلترة الحالية.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<div class="modal fade" id="courseModal" tabindex="-1" role="dialog" aria-labelledby="courseModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="courseModalLabel">إدارة المقرر</h5>
+          <small class="text-muted" id="courseModalMeta"></small>
+        </div>
+        <button type="button" class="close" data-dismiss="modal" aria-label="إغلاق">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <form id="courseEditForm" method="post">
+        <input type="hidden" name="next" value="{{ current_view }}">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group full">
+              <label for="modalCourseName">اسم المادة</label>
+              <input id="modalCourseName" class="form-control" name="name" required>
+            </div>
+            <div class="form-group">
+              <label for="modalCourseCode">رمز المادة</label>
+              <input id="modalCourseCode" class="form-control" name="code" required>
+            </div>
+            <div class="form-group">
+              <label for="modalCourseDepartment">القسم</label>
+              <select id="modalCourseDepartment" class="form-control" name="department" required>
+                {% for d in departments %}
+                <option value="{{ d.name }}">{{ d.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="modalCourseYear">السنة</label>
+              <select id="modalCourseYear" class="form-control" name="year" required>
+                {% for option in [1, 2, 3, 4] %}
+                <option value="{{ option }}">السنة {{ option }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group full">
+              <label for="modalCourseNotes">الملاحظات</label>
+              <textarea id="modalCourseNotes" class="form-control" name="notes" rows="4"></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer justify-content-between">
+          <button type="button" class="btn btn-outline-danger" id="courseDeleteBtn">حذف المقرر</button>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn btn-outline-secondary" data-dismiss="modal">إغلاق</button>
+            <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/courses.js') }}"></script>
+{% endblock %}

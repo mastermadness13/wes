@@ -1,4 +1,9 @@
-﻿:root {
+.table thead th {
+  background: #bacadf;
+  border-color: #1c1e21;
+  font-weight: 700;
+}
+:root {
   --bg: #eef3f8;
   --bg-accent: radial-gradient(circle at top left, rgba(79, 134, 247, 0.14), transparent 36%), radial-gradient(circle at top right, rgba(16, 185, 129, 0.11), transparent 28%), #eef3f8;
   --text: #132033;
@@ -320,6 +325,18 @@ label {
 }
 
 .info-box,
+[data-once-hint] {
+  transition: opacity 420ms ease, transform 420ms ease, filter 420ms ease;
+  will-change: opacity, transform;
+}
+
+[data-once-hint].hint-fade-out {
+  opacity: 0;
+  transform: translateY(-8px);
+  filter: blur(1px);
+  pointer-events: none;
+}
+
 .import-hint,
 .filter-panel,
 .notice-panel,

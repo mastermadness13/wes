@@ -5,8 +5,8 @@
     <div class="form-group"><label>Name</label><input class="form-control" name="name" required></div>
     <div class="form-group">
         <label>Department</label>
-        <select class="form-control" name="department" required>
-            <option value="">Select department</option>
+        <select class="form-control" name="department">
+            <option value="">غير محدد حالياً</option>
             {% for d in departments %}
             <option value="{{ d.name }}">{{ d.name }}</option>
             {% endfor %}
@@ -14,8 +14,8 @@
     </div>
     <div class="form-group">
         <label>Subject</label>
-        <select class="form-control" name="subject" required>
-            <option value="">Select subject</option>
+        <select class="form-control" name="subject">
+            <option value="">غير محدد حالياً</option>
             {% for s in subjects %}
             <option value="{{ s.name }}">{{ s.name }}</option>
             {% endfor %}

@@ -50,27 +50,6 @@ function initTooltips() {
     // Tooltips are handled by CSS hover
 }
 
-function initIdleHints() {
-    let idleTimer;
-    const hint = document.createElement('div');
-    hint.className = 'idle-hint';
-    hint.textContent = 'انقر على خلية فارغة لإضافة فصل';
-    document.body.appendChild(hint);
-
-    function resetTimer() {
-        clearTimeout(idleTimer);
-        hint.classList.remove('show');
-        idleTimer = setTimeout(() => {
-            hint.classList.add('show');
-            setTimeout(() => hint.classList.remove('show'), 5000);
-        }, 15000);
-    }
-
-    document.addEventListener('mousemove', resetTimer);
-    document.addEventListener('keypress', resetTimer);
-    resetTimer();
-}
-
 function initEmptyCellClicks() {
     document.addEventListener('click', function(event) {
         const cell = event.target.closest('.empty-cell');

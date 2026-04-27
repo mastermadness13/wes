@@ -1,4 +1,4 @@
-﻿function initCoursesList() {
+function initCoursesList() {
   const searchInput = document.getElementById('courseSearch');
   const rows = Array.from(document.querySelectorAll('#coursesTable tbody tr.course-row'));
   const modalEl = document.getElementById('courseModal');
@@ -66,6 +66,56 @@
   });
 }
 
+function initOneTimeHints() {
+  const hints = [
+    { key: 'courses-hero-summary' },
+    { key: 'courses-import-header' },
+    { key: 'courses-import-format' },
+  ];
+  const elements = [];
+
+  hints.forEach(({ key }) => {
+    const element = document.querySelector(`[data-once-hint="${key}"]`);
+    if (!element) return;
+
+    const storageKey = `hint-seen:${key}`;
+    const seenBefore = window.localStorage.getItem(storageKey) === '1';
+
+    if (seenBefore) {
+      element.remove();
+      return;
+    }
+
+    elements.push({ element, storageKey });
+  });
+
+  if (!elements.length) return;
+
+  let dismissed = false;
+  const removeListeners = () => {
+    document.removeEventListener('click', dismissHints, true);
+    document.removeEventListener('keydown', dismissHints, true);
+    document.removeEventListener('scroll', dismissHints, true);
+    document.removeEventListener('touchstart', dismissHints, true);
+  };
+
+  function dismissHints() {
+    if (dismissed) return;
+    dismissed = true;
+    elements.forEach(({ element, storageKey }) => {
+      element.classList.add('hint-fade-out');
+      window.localStorage.setItem(storageKey, '1');
+      window.setTimeout(() => element.remove(), 460);
+    });
+    removeListeners();
+  }
+
+  document.addEventListener('click', dismissHints, true);
+  document.addEventListener('keydown', dismissHints, true);
+  document.addEventListener('scroll', dismissHints, true);
+  document.addEventListener('touchstart', dismissHints, true);
+}
+
 function initCourseCodeGeneration(courseId = null) {
   const departmentInput = document.getElementById('department');
   const yearInput = document.getElementById('year');
@@ -102,6 +152,7 @@ function initCourseCodeGeneration(courseId = null) {
 document.addEventListener('DOMContentLoaded', function () {
   if (document.getElementById('coursesTable')) {
     initCoursesList();
+    initOneTimeHints();
   }
   if (document.getElementById('generateCodeBtn')) {
     const courseId = window.courseId || null;

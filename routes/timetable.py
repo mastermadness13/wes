@@ -19,6 +19,13 @@ def _safe_int(value, default=None):
         return default
 
 
+def _safe_timetable_redirect():
+    next_url = (request.args.get('next') or request.form.get('next') or '').strip()
+    if next_url.startswith('/'):
+        return redirect(next_url)
+    return redirect(url_for('timetable.list_timetable'))
+
+
 def _parse_time(value):
     return datetime.strptime(value, '%H:%M').time()
 
@@ -106,14 +113,14 @@ def _periods_from_form(form):
 
 
 def _build_allowed_semesters(selected_department_name, department_semester_map):
-    fallback = [1, 2, 3, 4, 5, 6, 7]
+    fallback = [2, 3, 4, 5, 6, 7, 8]
     if selected_department_name and selected_department_name in department_semester_map:
-        max_sem = max(1, int(department_semester_map[selected_department_name]))
-        return list(range(1, max_sem + 1))
+        max_sem = max(2, int(department_semester_map[selected_department_name]))
+        return list(range(2, max_sem + 1))
     if department_semester_map:
         values = set()
         for max_sem in department_semester_map.values():
-            values.update(range(1, max(1, int(max_sem)) + 1))
+            values.update(range(2, max(2, int(max_sem)) + 1))
         if values:
             return sorted(values)
     return fallback
@@ -456,6 +463,7 @@ def list_timetable():
         departments=departments,
         selected_department_name=selected_department_name,
         users=users,
+        selected_user_id=selected_user_id,
         courses=courses,
         teachers=teachers,
         rooms=rooms,
@@ -485,12 +493,12 @@ def create_timetable():
         resource_error = _validate_owner_resources(conn, owner_user_id, course_id, teacher_id, room_id)
         if resource_error:
             flash(resource_error, 'danger')
-            return redirect(url_for('timetable.create_timetable'))
+            return _safe_timetable_redirect()
 
         conflict_error = _validate_schedule_conflicts(conn, day=day, semester=semester, period_code=period_code, teacher_id=teacher_id, room_id=room_id)
         if conflict_error:
             flash(conflict_error, 'danger')
-            return redirect(url_for('timetable.create_timetable'))
+            return _safe_timetable_redirect()
 
         cursor = conn.execute('INSERT INTO timetable (user_id, day, semester, section, course_id, teacher_id, room_id) VALUES (?, ?, ?, ?, ?, ?, ?)', (owner_user_id, day, semester, period_code, course_id, teacher_id, room_id))
         entry_id = cursor.lastrowid
@@ -506,7 +514,7 @@ def create_timetable():
         )
         conn.commit()
         flash('Timetable entry created successfully.', 'success')
-        return redirect(url_for('timetable.list_timetable'))
+        return _safe_timetable_redirect()
 
     initial_rooms = _room_availability_rows(conn, default_day, default_semester, default_period_code)
     initial_teachers = _available_teachers(conn, default_day, default_semester, default_period_code, session['user_id'])
@@ -522,6 +530,7 @@ def create_timetable():
         default_day=default_day,
         default_semester=default_semester,
         default_period_code=default_period_code,
+        next_url=(request.args.get('next') or '').strip(),
     )
 
 
@@ -533,7 +542,7 @@ def edit_timetable(id):
     entry = conn.execute('SELECT * FROM timetable WHERE id = ?', (id,)).fetchone()
     if not _can_access_entry(entry):
         flash('You are not allowed to edit this entry.', 'danger')
-        return redirect(url_for('timetable.list_timetable'))
+        return _safe_timetable_redirect()
 
     if request.method == 'POST':
         day = request.form['day']
@@ -547,12 +556,12 @@ def edit_timetable(id):
         resource_error = _validate_owner_resources(conn, owner_user_id, course_id, teacher_id, room_id)
         if resource_error:
             flash(resource_error, 'danger')
-            return redirect(url_for('timetable.edit_timetable', id=id))
+            return _safe_timetable_redirect()
 
         conflict_error = _validate_schedule_conflicts(conn, day=day, semester=semester, period_code=period_code, teacher_id=teacher_id, room_id=room_id, exclude_entry_id=id)
         if conflict_error:
             flash(conflict_error, 'danger')
-            return redirect(url_for('timetable.edit_timetable', id=id))
+            return _safe_timetable_redirect()
 
         old_entry = _entry_with_relations(conn, id)
         conn.execute('UPDATE timetable SET user_id = ?, day = ?, semester = ?, section = ?, course_id = ?, teacher_id = ?, room_id = ? WHERE id = ?', (owner_user_id, day, semester, period_code, course_id, teacher_id, room_id, id))
@@ -569,7 +578,7 @@ def edit_timetable(id):
         )
         conn.commit()
         flash('Timetable entry updated successfully.', 'success')
-        return redirect(url_for('timetable.list_timetable'))
+        return _safe_timetable_redirect()
 
     enabled_periods = _get_periods(conn, enabled_only=True)
     available_rooms = _room_availability_rows(conn, entry['day'], entry['semester'], entry['section'], exclude_entry_id=id)
@@ -586,6 +595,7 @@ def edit_timetable(id):
         available_rooms=available_rooms,
         available_teachers=available_teachers,
         can_delete_critical=_can_delete_critical(),
+        next_url=(request.args.get('next') or '').strip(),
     )
 
 

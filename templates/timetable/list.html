@@ -8,7 +8,7 @@
         <p>اعرض الجدول حسب القسم والفصل الدراسي، ثم اطبع العرض النظيف مباشرة.</p>
       </div>
       <div class="timetable-actions">
-        <a href="{{ url_for('timetable.create_timetable') }}" class="btn btn-success">إضافة حصة</a>
+        <a href="{{ url_for('timetable.create_timetable', next=request.full_path.rstrip('?')) }}" class="btn btn-success">إضافة حصة</a>
         <button type="button" class="btn btn-outline-primary" onclick="window.print()">طباعة الجدول</button>
       </div>
     </div>
@@ -25,6 +25,18 @@
           {% endfor %}
         </select>
       </div>
+
+      {% if session.role == 'super_admin' %}
+      <div class="form-group mb-0">
+        <label for="userFilter">المستخدم</label>
+        <select id="userFilter" name="user_id" class="form-control">
+          <option value="">كل المستخدمين</option>
+          {% for user in users %}
+          <option value="{{ user.id }}" {% if user.id|string == selected_user_id %}selected{% endif %}>{{ user.username }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
 
       <div class="form-group mb-0 full">
         <label>الفصول الدراسية</label>
@@ -52,6 +64,7 @@
     <button class="btn btn-link p-0 mb-3" data-toggle="periodSettings">تعديل إعدادات الفترات</button>
     <div id="periodSettings" class="collapsible">
       <form method="post" action="{{ url_for('timetable.update_period_settings') }}">
+        <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
         <div class="timetable-period-grid">
           {% for period in period_settings %}
           <div class="period-card">
@@ -84,18 +97,45 @@
   </section>
   {% endif %}
 
-  <section class="page-card timetable-card print-area">
-    <div class="print-header">
-      <h2>{{ selected_department_name or 'جميع الأقسام' }}</h2>
-      <p>{% for semester in selected_semesters %}الفصل {{ semester }}{% if not loop.last %}، {% endif %}{% endfor %}</p>
-    </div>
 
-    <div class="timetable-summary mb-3 no-print">
-      <div class="summary-line">
-        <span class="badge-soft">القسم: {{ selected_department_name or 'كل الأقسام' }}</span>
-        <span class="badge-soft">الفصول: {% for semester in selected_semesters %}{{ semester }}{% if not loop.last %}، {% endif %}{% endfor %}</span>
+  <section class="page-card timetable-card print-area">
+    <!-- Header inside timetable card (always visible, also in print) -->
+    <div class="timetable-main-header print-area" style="text-align:center; margin-bottom: 1.5rem;">
+      <style>
+      @media print {
+        .timetable-main-header {
+          margin-bottom: 2.5cm !important;
+          page-break-inside: avoid;
+        }
+      }
+      </style>
+      <h2 style="margin-bottom:0.25em">{{ selected_department_name or 'جميع الأقسام' }}</h2>
+      <div style="font-size:1.2em; font-weight:500; margin-bottom:0.5em">
+        {% if selected_semesters|length == 1 %}
+          الفصل {{ selected_semesters[0] }}
+        {% else %}
+          {% for semester in selected_semesters %}الفصل {{ semester }}{% if not loop.last %}، {% endif %}{% endfor %}
+        {% endif %}
       </div>
-      <div class="small-note">الجدول يعرض فقط الفصول المختارة والفترة المفعلة.</div>
+      {% if session.role == 'super_admin' %}
+      <form method="get" style="display:inline-flex; gap:0.5em; align-items:center; margin-bottom:0.5em; flex-wrap:wrap;">
+        {% if selected_user_id %}
+        <input type="hidden" name="user_id" value="{{ selected_user_id }}">
+        {% endif %}
+        <select name="department_id" class="form-control" style="width:auto; display:inline-block;">
+          <option value="">كل الأقسام</option>
+          {% for dept in departments %}
+          <option value="{{ dept.id }}" {% if dept.id|string == selected_department_id %}selected{% endif %}>{{ dept.name }}</option>
+          {% endfor %}
+        </select>
+        <select name="semester" class="form-control" style="width:auto; display:inline-block;">
+          {% for semester in allowed_semesters %}
+          <option value="{{ semester }}" {% if selected_semesters and semester == selected_semesters[0] %}selected{% endif %}>الفصل {{ semester }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary">عرض</button>
+      </form>
+      {% endif %}
     </div>
 
     <div class="semester-stack">
@@ -142,7 +182,7 @@
                     {% if session.role == 'super_admin' %}
                     {% endif %}
                     <div class="schedule-actions no-print">
-                      <a href="{{ url_for('timetable.edit_timetable', id=entry.id) }}" class="btn btn-sm btn-outline-primary">تعديل</a>
+                      <a href="{{ url_for('timetable.edit_timetable', id=entry.id, next=request.full_path.rstrip('?')) }}" class="btn btn-sm btn-outline-primary">تعديل</a>
                       {% if can_delete_critical %}
                       <button class="btn btn-sm btn-outline-danger delete-entry-btn" type="button" data-id="{{ entry.id }}">حذف</button>
                       {% endif %}

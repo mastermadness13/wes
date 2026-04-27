@@ -18,12 +18,19 @@ def list_rooms():
 @super_admin_required
 def create_room():
     if request.method == 'POST':
-        name = request.form['name']
-        name_ar = request.form['name_ar']
-        type_ = request.form['type']
-        status = request.form['status']
+        name = request.form.get('name')
+        name_ar = request.form.get('name_ar')
+        # إذا لم يُرسل name استخدم name_ar
+        if not name and name_ar:
+            name = name_ar
+        type_ = request.form.get('type')
+        status = request.form.get('status')
         capacity = request.form.get('capacity', type=int)
-        location = request.form['location']
+        location = request.form.get('location')
+
+        if not name:
+            flash('يجب إدخال اسم القاعة بأي لغة', 'danger')
+            return redirect(request.referrer or url_for('rooms.list_rooms'))
 
         conn = db.get_db()
         try:
@@ -48,12 +55,19 @@ def edit_room(id):
         return redirect(url_for('rooms.list_rooms'))
 
     if request.method == 'POST':
-        name = request.form['name']
-        name_ar = request.form['name_ar']
-        type_ = request.form['type']
-        status = request.form['status']
+        name = request.form.get('name')
+        name_ar = request.form.get('name_ar')
+        # إذا لم يُرسل name استخدم name_ar
+        if not name and name_ar:
+            name = name_ar
+        type_ = request.form.get('type')
+        status = request.form.get('status')
         capacity = request.form.get('capacity', type=int)
-        location = request.form['location']
+        location = request.form.get('location')
+
+        if not name:
+            flash('يجب إدخال اسم القاعة بأي لغة', 'danger')
+            return redirect(request.referrer or url_for('rooms.list_rooms'))
 
         try:
             conn.execute('UPDATE rooms SET name = ?, name_ar = ?, type = ?, status = ?, capacity = ?, location = ? WHERE id = ?',

@@ -1,4 +1,4 @@
-﻿import secrets
+import secrets
 from flask import Flask, g, session
 from config import Config
 import db
@@ -61,11 +61,21 @@ def create_app():
     app.register_blueprint(attendance_bp, url_prefix='/attendance')
     app.register_blueprint(history_bp, url_prefix='/history')
 
+    db.create_default_users()
+    db.create_default_departments()
+    db.create_default_rooms()
+    db.create_default_courses()
+    db.create_default_teachers()
+
     return app
 
 
 if __name__ == '__main__':
     db.init_db()
     db.create_default_users()
+    db.create_default_departments()
+    db.create_default_rooms()
+    db.create_default_courses()
+    db.create_default_teachers()
     app = create_app()
     app.run(debug=True )

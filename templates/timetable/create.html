@@ -6,10 +6,11 @@
       <h2>إضافة حصة جديدة</h2>
       <p>اختر اليوم والفصل والفترة، ثم اربط المادة والمدرس والقاعة المتاحة.</p>
     </div>
-    <a href="{{ url_for('timetable.list_timetable') }}" class="btn btn-outline-secondary">العودة إلى الجدول</a>
+    <a href="{{ next_url or url_for('timetable.list_timetable') }}" class="btn btn-outline-secondary">العودة إلى الجدول</a>
   </div>
 
   <form method="post" id="timetableForm">
+    <input type="hidden" name="next" value="{{ next_url }}">
     <div class="form-grid">
       <div class="form-group">
         <label for="day">اليوم</label>

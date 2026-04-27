@@ -102,6 +102,7 @@ function initTimetableList() {
     url.searchParams.set('day', day);
     url.searchParams.set('semester', semester);
     url.searchParams.set('section', periodCode);
+    url.searchParams.set('next', `${window.location.pathname}${window.location.search}`);
     window.location.href = url.toString();
   });
 }
@@ -121,6 +122,30 @@ function renderRoomOptions(select, rooms, selectedValue) {
     option.value = String(room.id);
     option.textContent = `${room.name_ar || room.name}${room.is_available ? '' : ' - محجوزة'}`;
     option.disabled = !room.is_available && String(room.id) !== String(selectedValue || '');
+    select.appendChild(option);
+  });
+
+  if (selectedValue && select.querySelector(`option[value="${selectedValue}"]`)) {
+    select.value = selectedValue;
+  }
+
+  return Boolean(select.value);
+}
+
+function renderTeacherOptions(select, teachers, selectedValue) {
+  select.innerHTML = '';
+  if (!teachers.length) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'لا يوجد مدرسون متاحون.';
+    select.appendChild(option);
+    return false;
+  }
+
+  teachers.forEach((teacher) => {
+    const option = document.createElement('option');
+    option.value = String(teacher.id);
+    option.textContent = teacher.name;
     select.appendChild(option);
   });
 
@@ -181,31 +206,27 @@ function initTimetableForm(allCourses = [], allTeachers = [], entryId = null, or
     return renderRoomOptions(roomSelect, payload.rooms || [], originalRoomId);
   }
 
+  async function refreshTeacherOptions() {
+    const params = new URLSearchParams({
+      day: day.value,
+      semester: semester.value,
+      section: period.value,
+    });
+    if (entryId) {
+      params.set('exclude_id', entryId);
+    }
+
+    const response = await fetch(`${window.location.origin}/timetable/available-teachers?${params.toString()}`);
+    const payload = await response.json();
+    return renderTeacherOptions(teacherSelect, payload.teachers || [], originalTeacherId);
+  }
+
   async function refreshAvailability() {
     submitBtn.disabled = true;
     const courseOk = refreshCourseOptions();
     const roomOk = await refreshRoomOptions();
-
-    teacherSelect.innerHTML = '';
-    if (!allTeachers.length) {
-      const option = document.createElement('option');
-      option.value = '';
-      option.textContent = 'No teachers available.';
-      teacherSelect.appendChild(option);
-    } else {
-      allTeachers.forEach((teacher) => {
-        const option = document.createElement('option');
-        option.value = teacher.id;
-        option.textContent = teacher.name;
-        teacherSelect.appendChild(option);
-      });
-    }
-
-    if (originalTeacherId && teacherSelect.querySelector(`option[value="${originalTeacherId}"]`)) {
-      teacherSelect.value = originalTeacherId;
-    }
-
-    submitBtn.disabled = !(courseOk && roomOk && teacherSelect.value);
+    const teacherOk = await refreshTeacherOptions();
+    submitBtn.disabled = !(courseOk && roomOk && teacherOk);
   }
 
   [day, semester, period].forEach((element) => {

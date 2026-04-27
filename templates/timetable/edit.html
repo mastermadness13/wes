@@ -6,10 +6,11 @@
       <h2>تعديل الحصة</h2>
       <p>حدّث اليوم أو الفترة أو المقرر مع التأكد من عدم وجود تعارض في القاعة أو المدرس.</p>
     </div>
-    <a href="{{ url_for('timetable.list_timetable') }}" class="btn btn-outline-secondary">العودة إلى الجدول</a>
+    <a href="{{ next_url or url_for('timetable.list_timetable') }}" class="btn btn-outline-secondary">العودة إلى الجدول</a>
   </div>
 
   <form method="post" id="edit-timetable-form">
+    <input type="hidden" name="next" value="{{ next_url }}">
     <div class="form-grid">
       <div class="form-group">
         <label for="day">اليوم</label>
@@ -40,7 +41,7 @@
 
       <div class="form-group">
         <label for="course_id">المقرر</label>
-        <select class="form-control" name="course_id" required>
+        <select class="form-control" name="course_id" id="course_id" required>
           {% for c in courses %}
           <option value="{{ c.id }}" {% if c.id == entry.course_id %}selected{% endif %}>{{ c.name }} — {{ c.code }}</option>
           {% endfor %}

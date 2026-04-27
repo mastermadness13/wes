@@ -1,9 +1,9 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% block content %}
 <div class="courses-page">
   <section class="page-card courses-hero no-print">
     <div class="page-title">
-      <div class="page-summary">
+      <div class="page-summary" data-once-hint="courses-hero-summary">
         <h2>المقررات</h2>
         <p>استورد المقررات من Excel أو صفِّها حسب القسم ثم افتح أي مقرر لإدارته من نافذة واحدة.</p>
       </div>
@@ -17,7 +17,7 @@
   <section class="page-card courses-tools no-print">
     <div class="courses-tool-grid">
       <div class="import-panel">
-        <div class="section-header mb-3">
+        <div class="section-header mb-3" data-once-hint="courses-import-header">
           <div>
             <h3>استيراد Excel</h3>
             <p class="mb-0">ارفع ملف .xlsx واحدًا يحتوي على الأعمدة المطلوبة فقط.</p>
@@ -32,7 +32,7 @@
             <button class="btn btn-primary" type="submit">رفع الملف</button>
           </div>
         </form>
-        <div class="import-hint mt-3">
+        <div class="import-hint mt-3" data-once-hint="courses-import-format">
           <strong>التنسيق المطلوب:</strong>
           <ul class="helper-list">
             <li>كود المادة</li>
@@ -81,41 +81,123 @@
     </div>
 
     <div class="courses-table-wrap">
-      <table class="table table-hover courses-table" id="coursesTable">
-        <thead>
+      <table class="table table-bordered table-striped text-center" id="coursesTable">
+        <thead class="thead-dark">
           <tr>
-            <th>#</th>
-            <th>كود المادة</th>
-            <th>اسم المادة</th>
+            <th>كود المقرر</th>
+            <th>اسم المقرر</th>
             <th>القسم</th>
-            <th>السنة</th>
-            <th>الملاحظات</th>
+            <th>الفصل</th>
+            <th>الوحدات</th>
+            <th>نظري</th>
+            <th>عملي</th>
+            <th>القاعة</th>
           </tr>
         </thead>
         <tbody>
           {% for c in courses %}
-          <tr class="course-row" role="button"
-              data-course-id="{{ c.id }}"
-              data-course-name="{{ c.name|e }}"
-              data-course-code="{{ c.code|e }}"
-              data-course-department="{{ c.department|e }}"
-              data-course-year="{{ c.year }}"
-              data-course-notes="{{ (c.notes or '')|e }}">
-            <td>{{ c.id }}</td>
-            <td><span class="badge-soft">{{ c.code }}</span></td>
-            <td>{{ c.name }}</td>
-            <td>{{ c.department }}</td>
-            <td>السنة {{ c.year }}</td>
-            <td class="notes-cell">{{ c.notes or 'لا توجد ملاحظات' }}</td>
+          <tr class="course-row" data-department="{{ c.department }}" data-semester="{{ c.semester }}">
+            <td contenteditable="true">{{ c.code }}</td>
+            <td contenteditable="true">{{ c.name }}</td>
+            <td contenteditable="true">{{ c.department }}</td>
+            <td contenteditable="true">{{ c.semester }}</td>
+            <td contenteditable="true">{{ c.units }}</td>
+            <td contenteditable="true">{{ c.theory }}</td>
+            <td contenteditable="true">{{ c.practice }}</td>
+            <td>
+              <select class="form-control d-inline-block w-auto" style="min-width:100px">
+                <option value="">غير محددة</option>
+                {% for room in rooms %}
+                <option value="{{ room.name }}" {% if c.room == room.name %}selected{% endif %}>{{ room.name }}</option>
+                {% endfor %}
+              </select>
+            </td>
           </tr>
           {% else %}
+          <!-- بيانات وهمية (Dummy Data) في حال عدم وجود بيانات -->
           <tr>
-            <td colspan="6" class="text-center py-4 text-muted">لا توجد مقررات حتى الآن.</td>
+            <td contenteditable="true">CS101</td>
+            <td contenteditable="true">برمجة 1</td>
+            <td contenteditable="true">علوم الحاسوب</td>
+            <td contenteditable="true">1</td>
+            <td contenteditable="true">3</td>
+            <td contenteditable="true">2</td>
+            <td contenteditable="true">1</td>
+            <td>
+              <select class="form-control d-inline-block w-auto" style="min-width:100px">
+                <option value="">غير محددة</option>
+                <option value="قاعة 1">قاعة 1</option>
+                <option value="معمل حاسوب 1">معمل حاسوب 1</option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td contenteditable="true">EL202</td>
+            <td contenteditable="true">الكترونيات رقمية</td>
+            <td contenteditable="true">هندسة كهربائية</td>
+            <td contenteditable="true">3</td>
+            <td contenteditable="true">4</td>
+            <td contenteditable="true">3</td>
+            <td contenteditable="true">1</td>
+            <td>
+              <select class="form-control d-inline-block w-auto" style="min-width:100px">
+                <option value="">غير محددة</option>
+                <option value="معمل إلكترونيات 1">معمل إلكترونيات 1</option>
+                <option value="قاعة 2">قاعة 2</option>
+              </select>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
+      <div id="unitsAlert" class="alert alert-warning mt-2 d-none text-right" role="alert">
+        مجموع (نظري + عملي) يجب أن يساوي عدد الوحدات!
+      </div>
     </div>
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // بحث
+    document.getElementById('courseSearch').addEventListener('input', function() {
+      let val = this.value.trim();
+      document.querySelectorAll('#coursesTable tbody tr').forEach(function(row) {
+        row.style.display = [...row.children].some(td => td.innerText.includes(val)) ? '' : 'none';
+      });
+    });
+
+    // فلترة حسب القسم والفصل
+    document.getElementById('filterDepartment').addEventListener('change', filterTable);
+    document.getElementById('filterSemester').addEventListener('change', filterTable);
+
+    function filterTable() {
+      let dept = document.getElementById('filterDepartment').value;
+      let sem = document.getElementById('filterSemester').value;
+      document.querySelectorAll('#coursesTable tbody tr').forEach(function(row) {
+        let show = true;
+        if (dept && row.dataset.department !== dept) show = false;
+        if (sem && row.dataset.semester !== sem) show = false;
+        row.style.display = show ? '' : 'none';
+      });
+    }
+
+    // تحقق من مجموع الوحدات
+    document.querySelectorAll('#coursesTable tbody').forEach(function(tbody) {
+      tbody.addEventListener('input', function(e) {
+        if (e.target.parentElement.tagName === 'TR') {
+          let row = e.target.parentElement;
+          let units = parseInt(row.children[4].innerText) || 0;
+          let theory = parseInt(row.children[5].innerText) || 0;
+          let practice = parseInt(row.children[6].innerText) || 0;
+          let alert = document.getElementById('unitsAlert');
+          if (units !== (theory + practice)) {
+            alert.classList.remove('d-none');
+          } else {
+            alert.classList.add('d-none');
+          }
+        }
+      });
+    });
+  });
+  </script>
   </section>
 </div>
 

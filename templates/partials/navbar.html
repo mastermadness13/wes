@@ -21,38 +21,37 @@
       <li class="nav-item {{ 'active' if ep == 'auth.dashboard' else '' }}">
         <a class="nav-link" href="{{ url_for('auth.dashboard') }}">الرئيسية</a>
       </li>
-      <li class="nav-item {{ 'active' if ep.startswith('courses.') else '' }}">
-        <a class="nav-link" href="{{ url_for('courses.list_courses') }}">المقررات</a>
-      </li>
+      {% if role == 'super_admin' %}
+        <li class="nav-item {{ 'active' if ep.startswith('courses.') else '' }}">
+          <a class="nav-link" href="{{ url_for('courses.list_courses') }}">المقررات</a>
+        </li>
+        <li class="nav-item {{ 'active' if ep.startswith('history.') else '' }}">
+          <a class="nav-link" href="{{ url_for('history.list_history') }}">سجل التغييرات</a>
+        </li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="academicMenu" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            البيانات الأكاديمية
+          </a>
+          <div class="dropdown-menu" aria-labelledby="academicMenu">
+            <a class="dropdown-item" href="{{ url_for('teachers.list_teachers') }}">المدرسون</a>
+            <a class="dropdown-item" href="{{ url_for('students.list_students') }}">الطلاب</a>
+            <a class="dropdown-item" href="{{ url_for('attendance.list_attendance') }}">الحضور</a>
+          </div>
+        </li>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="systemMenu" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            إدارة النظام
+          </a>
+          <div class="dropdown-menu" aria-labelledby="systemMenu">
+            <a class="dropdown-item" href="{{ url_for('users.list_users') }}">إدارة المستخدمين</a>
+            <a class="dropdown-item" href="{{ url_for('departments.list_departments') }}">الأقسام</a>
+            <a class="dropdown-item" href="{{ url_for('rooms.list_rooms') }}">القاعات</a>
+          </div>
+        </li>
+      {% endif %}
       <li class="nav-item {{ 'active' if ep.startswith('timetable.') else '' }}">
         <a class="nav-link" href="{{ url_for('timetable.list_timetable') }}">الجدول الدراسي</a>
       </li>
-      <li class="nav-item {{ 'active' if ep.startswith('history.') else '' }}">
-        <a class="nav-link" href="{{ url_for('history.list_history') }}">سجل التغييرات</a>
-      </li>
-
-      {% if role == 'super_admin' %}
-      <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="academicMenu" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          البيانات الأكاديمية
-        </a>
-        <div class="dropdown-menu" aria-labelledby="academicMenu">
-          <a class="dropdown-item" href="{{ url_for('teachers.list_teachers') }}">المدرسون</a>
-          <a class="dropdown-item" href="{{ url_for('students.list_students') }}">الطلاب</a>
-          <a class="dropdown-item" href="{{ url_for('attendance.list_attendance') }}">الحضور</a>
-        </div>
-      </li>
-      <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="systemMenu" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          إدارة النظام
-        </a>
-        <div class="dropdown-menu" aria-labelledby="systemMenu">
-          <a class="dropdown-item" href="{{ url_for('users.list_users') }}">إدارة المستخدمين</a>
-          <a class="dropdown-item" href="{{ url_for('departments.list_departments') }}">الأقسام</a>
-          <a class="dropdown-item" href="{{ url_for('rooms.list_rooms') }}">القاعات</a>
-        </div>
-      </li>
-      {% endif %}
     </ul>
 
     <ul class="navbar-nav align-items-lg-center">

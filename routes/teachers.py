@@ -12,6 +12,10 @@ def _get_departments_and_subjects(conn):
     return departments, subjects
 
 
+def _clean_optional_value(value):
+    return (value or '').strip()
+
+
 @teachers_bp.route('/')
 @login_required
 @super_admin_required
@@ -61,14 +65,14 @@ def create_teacher():
     departments, subjects = _get_departments_and_subjects(conn)
 
     if request.method == 'POST':
-        name = request.form['name']
-        department = request.form['department']
-        subject = request.form['subject']
+        name = request.form['name'].strip()
+        department = _clean_optional_value(request.form.get('department'))
+        subject = _clean_optional_value(request.form.get('subject'))
 
         valid_departments = {row['name'] for row in departments}
         valid_subjects = {row['name'] for row in subjects}
-        if department not in valid_departments or subject not in valid_subjects:
-            flash('Please select department and subject from the list.', 'danger')
+        if (department and department not in valid_departments) or (subject and subject not in valid_subjects):
+            flash('Please select department and subject from the list, or leave them blank for now.', 'danger')
             return render_template('teachers/create.html', departments=departments, subjects=subjects)
 
         conn.execute(
@@ -95,14 +99,14 @@ def edit_teacher(id):
         return redirect(url_for('teachers.list_teachers'))
 
     if request.method == 'POST':
-        name = request.form['name']
-        department = request.form['department']
-        subject = request.form['subject']
+        name = request.form['name'].strip()
+        department = _clean_optional_value(request.form.get('department'))
+        subject = _clean_optional_value(request.form.get('subject'))
 
         valid_departments = {row['name'] for row in departments}
         valid_subjects = {row['name'] for row in subjects}
-        if department not in valid_departments or subject not in valid_subjects:
-            flash('Please select department and subject from the list.', 'danger')
+        if (department and department not in valid_departments) or (subject and subject not in valid_subjects):
+            flash('Please select department and subject from the list, or leave them blank for now.', 'danger')
             return render_template('teachers/edit.html', teacher=teacher, departments=departments, subjects=subjects)
 
         conn.execute('UPDATE teachers SET name=?, department=?, subject=? WHERE id=?',

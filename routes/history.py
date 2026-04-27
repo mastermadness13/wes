@@ -3,7 +3,7 @@
 from flask import Blueprint, render_template, request
 
 import db
-from routes import courses_timetable_admin_required, login_required
+from routes import login_required, super_admin_required
 
 history_bp = Blueprint('history', __name__)
 
@@ -24,7 +24,7 @@ def _display_history_value(raw_value):
 
 @history_bp.route('/')
 @login_required
-@courses_timetable_admin_required
+@super_admin_required
 def list_history():
     conn = db.get_db()
     action = (request.args.get('action') or '').strip().upper()

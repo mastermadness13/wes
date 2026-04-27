@@ -41,32 +41,144 @@
 {% endif %}
 
 <button class="btn btn-success mb-3" data-toggle="modal" data-target="#addTeacherModal">إضافة مدرس</button>
+
 <table class="table table-bordered">
-    <thead class="thead-dark">
-    {% if session.role == 'super_admin' %}
-    <tr><th>الاسم</th><th>القسم</th><th>الفصول</th><th>عدد المواد</th><th>الإجراءات</th></tr>
-    {% else %}
-    <tr><th>الاسم</th><th>الفصول</th><th>عدد المواد</th><th>الإجراءات</th></tr>
-    {% endif %}
-    </thead>
-    <tbody>
-    {% for t in teachers %}
-        <tr>
-            <td><a href="#" data-toggle="modal" data-target="#teacherDetailsModal" data-teacher-id="{{ t.id }}" data-name="{{ t.name }}" data-num-subjects="{{ t.num_subjects }}" data-semesters="{{ t.semesters }}" data-department="{{ t.department }}">{{ t.name }}</a></td>
-            {% if session.role == 'super_admin' %}
-            <td>{{ t.department }}</td>
-            {% endif %}
-            <td>{{ t.semesters or 'N/A' }}</td>
-            <td>{{ t.num_subjects }}</td>
-            <td>
-                <a href="{{ url_for('teachers.edit_teacher', id=t.id) }}" class="btn btn-sm btn-primary">تعديل</a>
-                <form method="post" action="{{ url_for('teachers.delete_teacher', id=t.id) }}" style="display:inline;" onsubmit="return confirm('هل أنت متأكد؟');">
-                    <button class="btn btn-sm btn-danger" type="submit">حذف</button>
-                </form>
-            </td>
-        </tr>
-    {% endfor %}
-    </tbody>
+  <thead class="thead-dark">
+    <tr>
+      <th>#</th>
+      <th>الاسم الكامل</th>
+      <th>الرقم الأكاديمي</th>
+      <th>الرقم الوطني</th>
+      <th>المؤهل العلمي</th>
+      <th>الدرجة العلمية</th>
+      <th>الصنف</th>
+      <th>رقم الهاتف</th>
+      <th>الإجراءات</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for t in teachers %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ t.name }}</td>
+      <td>{{ t.academic_number }}</td>
+      <td>{{ t.national_id }}</td>
+      <td>{{ t.qualification }}</td>
+      <td>{{ t.academic_rank }}</td>
+      <td>{{ t.category }}</td>
+      <td>{{ t.phone }}</td>
+      <td>
+        <button class="btn btn-sm btn-primary" data-toggle="modal" data-target="#editTeacherModal{{ t.id }}">تعديل</button>
+                <!-- نافذة منبثقة لتعديل عضو هيئة التدريس أو المعيد -->
+                <div class="modal fade" id="editTeacherModal{{ t.id }}" tabindex="-1" role="dialog" aria-labelledby="editTeacherModalLabel{{ t.id }}" aria-hidden="true">
+                  <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                      <form method="post" action="{{ url_for('teachers.edit_teacher', id=t.id) }}">
+                        <div class="modal-header">
+                          <h5 class="modal-title" id="editTeacherModalLabel{{ t.id }}">تعديل عضو هيئة التدريس أو المعيد</h5>
+                          <button type="button" class="close" data-dismiss="modal" aria-label="إغلاق">
+                            <span aria-hidden="true">&times;</span>
+                          </button>
+                        </div>
+                        <div class="modal-body">
+                          <div class="form-group">
+                            <label>الاسم الكامل</label>
+                            <input value="{{ t.name }}" class="form-control" name="name" required>
+                          </div>
+                          <div class="form-group">
+                            <label>الرقم الأكاديمي</label>
+                            <input value="{{ t.academic_number }}" class="form-control" name="academic_number" required>
+                          </div>
+                          <div class="form-group">
+                            <label>الرقم الوطني</label>
+                            <input value="{{ t.national_id }}" class="form-control" name="national_id" required>
+                          </div>
+                          <div class="form-group">
+                            <label>المؤهل العلمي</label>
+                            <select class="form-control qualification-select" name="qualification" required>
+                              <option value="">اختر المؤهل</option>
+                              <option value="دبلوم" {% if t.qualification == 'دبلوم' %}selected{% endif %}>دبلوم</option>
+                              <option value="بكالوريوس" {% if t.qualification == 'بكالوريوس' %}selected{% endif %}>بكالوريوس</option>
+                              <option value="ماجستير" {% if t.qualification == 'ماجستير' %}selected{% endif %}>ماجستير</option>
+                            </select>
+                          </div>
+                          <div class="form-group">
+                            <label>الدرجة العلمية</label>
+                            <select class="form-control rank-select" name="academic_rank" required>
+                              <option value="">اختر الدرجة</option>
+                              <option value="أستاذ" {% if t.academic_rank == 'أستاذ' %}selected{% endif %}>أستاذ</option>
+                              <option value="أستاذ مشارك" {% if t.academic_rank == 'أستاذ مشارك' %}selected{% endif %}>أستاذ مشارك</option>
+                              <option value="أستاذ مساعد" {% if t.academic_rank == 'أستاذ مساعد' %}selected{% endif %}>أستاذ مساعد</option>
+                              <option value="محاضر" {% if t.academic_rank == 'محاضر' %}selected{% endif %}>محاضر</option>
+                              <option value="محاضر مساعد" {% if t.academic_rank == 'محاضر مساعد' %}selected{% endif %}>محاضر مساعد</option>
+                              <option value="أستاذ متعاون" {% if t.academic_rank == 'أستاذ متعاون' %}selected{% endif %}>أستاذ متعاون</option>
+                            </select>
+                          </div>
+                          <div class="form-group">
+                            <label>الصنف / الفئة</label>
+                            <select class="form-control" name="category" required>
+                              <option value="">اختر الصنف</option>
+                              <option value="عضو هيئة تدريس" {% if t.category == 'عضو هيئة تدريس' %}selected{% endif %}>عضو هيئة تدريس</option>
+                              <option value="عضو هيئة تدريس متعاون" {% if t.category == 'عضو هيئة تدريس متعاون' %}selected{% endif %}>عضو هيئة تدريس متعاون</option>
+                              <option value="معيد" {% if t.category == 'معيد' %}selected{% endif %}>معيد</option>
+                            </select>
+                          </div>
+                          <div class="form-group">
+                            <label>رقم الهاتف</label>
+                            <input value="{{ t.phone }}" class="form-control" name="phone">
+                          </div>
+                          <div class="form-group">
+                            <label>القسم</label>
+                            <input value="{{ t.department or '' }}" class="form-control" name="department">
+                          </div>
+                          <div class="form-group">
+                            <label>المادة</label>
+                            <input value="{{ t.subject or '' }}" class="form-control" name="subject">
+                          </div>
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-secondary" data-dismiss="modal">إلغاء</button>
+                          <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+        <script>
+        // منطق ديناميكي بين المؤهل العلمي والدرجة العلمية في جميع modals
+        function updateRanks(modal) {
+          const qualification = modal.querySelector('.qualification-select').value;
+          const rankSelect = modal.querySelector('.rank-select');
+          const current = rankSelect.value;
+          const allowed = {
+            'دبلوم': ['محاضر مساعد', 'أستاذ متعاون', 'معيد'],
+            'بكالوريوس': ['محاضر مساعد', 'محاضر', 'أستاذ متعاون'],
+            'ماجستير': ['محاضر', 'أستاذ مساعد', 'أستاذ متعاون']
+          }[qualification] || [
+            'أستاذ', 'أستاذ مشارك', 'أستاذ مساعد', 'محاضر', 'محاضر مساعد', 'أستاذ متعاون'
+          ];
+          for (const opt of rankSelect.options) {
+            if (opt.value === '') continue;
+            opt.style.display = allowed.includes(opt.value) ? '' : 'none';
+            if (!allowed.includes(current)) rankSelect.value = '';
+          }
+        }
+        document.querySelectorAll('.modal').forEach(function(modal) {
+          const qualificationSelect = modal.querySelector('.qualification-select');
+          if (qualificationSelect) {
+            qualificationSelect.addEventListener('change', function() { updateRanks(modal); });
+            modal.addEventListener('shown.bs.modal', function() { updateRanks(modal); });
+            window.addEventListener('DOMContentLoaded', function() { updateRanks(modal); });
+          }
+        });
+        </script>
+        <form method="post" action="{{ url_for('teachers.delete_teacher', id=t.id) }}" style="display:inline;" onsubmit="return confirm('هل أنت متأكد؟');">
+          <button class="btn btn-sm btn-danger" type="submit">حذف</button>
+        </form>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
 </table>
 
 <div class="modal fade" id="addTeacherModal" tabindex="-1" role="dialog" aria-labelledby="addTeacherModalLabel" aria-hidden="true">
@@ -86,7 +198,7 @@
           </div>
           <div class="form-group">
             <label>القسم</label>
-            <select class="form-control" name="department" required>
+            <select class="form-control" name="department">
               <option value="">اختر القسم</option>
               {% for d in departments %}
               <option value="{{ d.name }}">{{ d.name }}</option>
@@ -95,7 +207,7 @@
           </div>
           <div class="form-group">
             <label>المادة</label>
-            <select class="form-control" name="subject" required>
+            <select class="form-control" name="subject">
               <option value="">Select subject</option>
               {% for s in subjects %}
               <option value="{{ s.name }}">{{ s.name }}</option>

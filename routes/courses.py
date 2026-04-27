@@ -21,7 +21,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font
 
 import db
-from routes import courses_timetable_admin_required, login_required
+from routes import super_admin_required, login_required
 
 courses_bp = Blueprint('courses', __name__)
 
@@ -35,8 +35,8 @@ HEADER_ALIASES = {
     'Notes': {'notes', 'note', 'ملاحظات', 'ملاحظة'},
 }
 CATEGORY_HINTS = {
-    'هـ': ('هندسة', 'engineering', 'engineer', 'مدني', 'كهرب', 'ميكاني', 'عمارة'),
-    'ت': ('تقنية', 'technology', 'tech', 'حاسب', 'معلومات', 'برمج', 'اتصالات'),
+    'ه': ('قسم النفط', 'قسم المدني', 'قسم المعماري', 'هندسة', 'engineering', 'engineer', 'مدني', 'كهرب', 'ميكاني', 'عمارة'),
+    'ت': ('قسم الحاسوب', 'قسم الاتصالات', 'تقنية', 'technology', 'tech', 'حاسب', 'معلومات', 'برمج', 'اتصالات'),
 }
 
 
@@ -51,11 +51,17 @@ def _history_actor():
 def _course_history_message(action, course):
     actor = session.get('username') or 'System'
     name = course.get('name') or f"Course #{course.get('id')}"
-    code = course.get('code') or ''
     department = course.get('department') or ''
     year = course.get('year') or ''
     action_word = {'ADD': 'added', 'EDIT': 'updated', 'DELETE': 'deleted'}.get(action, 'changed')
-    return f"{actor} {action_word} course {name} ({code}) in {department}, year {year}."
+    return f"{actor} {action_word} course {name} in {department}, year {year}."
+
+
+def _safe_redirect_to_courses():
+    next_url = (request.args.get('next') or request.form.get('next') or '').strip()
+    if next_url.startswith('/'):
+        return redirect(next_url)
+    return redirect(url_for('courses.list_courses'))
 
 
 def _valid_department_names(departments):
@@ -63,7 +69,8 @@ def _valid_department_names(departments):
 
 
 def _normalize_course_code(code):
-    return (code or '').strip().replace('ه', 'هـ')
+    value = (code or '').strip()
+    return value.replace('هـ', 'ه')
 
 
 def _normalize_notes(notes):
@@ -103,6 +110,12 @@ def _sanitize_excel_text(value):
 
 def _infer_category_letter(department_name):
     normalized = (department_name or '').strip().lower()
+    if normalized in {'قسم النفط', 'قسم المدني', 'قسم المعماري'}:
+        return 'ه'
+    if normalized in {'قسم الحاسوب', 'قسم الاتصالات'}:
+        return 'ت'
+    if normalized == 'القسم العام':
+        return 'ع'
     for letter, hints in CATEGORY_HINTS.items():
         if any(hint in normalized for hint in hints):
             return letter
@@ -167,7 +180,7 @@ def _validate_course_form(conn, form_data, departments, owner_user_id, exclude_c
     if not code:
         errors.append('رمز المادة مطلوب.')
     elif not COURSE_CODE_PATTERN.match(code):
-        errors.append('الرمز يجب أن يبدأ بحرف القسم (هـ، ت، أو ع) متبوعاً بثلاثة أرقام مثل هـ101 أو ت205.')
+        errors.append('الرمز يجب أن يبدأ بحرف القسم (هـ، ت، أو ع) متبوعاً بثلاثة أرقام مثل ه101 أو ت205.')
     elif year is not None and code[1] != str(year):
         errors.append('الرقم الأول بعد حرف القسم يجب أن يطابق السنة الدراسية المختارة.')
     elif _code_exists(conn, code, owner_user_id, exclude_course_id=exclude_course_id):
@@ -286,7 +299,7 @@ def _validate_import_rows(conn, departments, rows):
         if not corrupted and not code:
             errors.append(f"الصف {row['row_number']}: رمز المادة مطلوب.")
         elif not corrupted and not COURSE_CODE_PATTERN.match(code):
-            errors.append(f"الصف {row['row_number']}: الرموز المقبولة هي هـ101 أو ت205 أو ع102؛ حرف القسم ثم ثلاثة أرقام.")
+            errors.append(f"الصف {row['row_number']}: الرموز المقبولة هي ه101 أو ت205 أو ع102؛ حرف القسم ثم ثلاثة أرقام.")
         elif not corrupted and year is not None and code[1] != str(year):
             errors.append(f"الصف {row['row_number']}: الرقم الأول بعد حرف القسم يجب أن يطابق السنة الدراسية المحددة.")
 
@@ -371,10 +384,12 @@ def _upsert_course(conn, course_data):
 
 @courses_bp.route('/')
 @login_required
-@courses_timetable_admin_required
+@super_admin_required
 def list_courses():
     conn = db.get_db()
-    department = request.args.get('department', '')
+    department = (request.args.get('department') or '').strip()
+    search = (request.args.get('q') or '').strip()
+    selected_year = _parse_year(request.args.get('year'))
     departments = _get_departments(conn)
 
     if session.get('role') == 'super_admin':
@@ -388,7 +403,13 @@ def list_courses():
         if department:
             sql += ' AND c.department = ?'
             params.append(department)
-        sql += ' ORDER BY c.created_at DESC, c.id DESC'
+        if selected_year is not None:
+            sql += ' AND c.year = ?'
+            params.append(selected_year)
+        if search:
+            sql += ' AND (c.name LIKE ? OR c.code LIKE ?)'
+            params.extend([f'%{search}%', f'%{search}%'])
+        sql += ' ORDER BY c.year, c.code, c.name'
         courses = conn.execute(sql, params).fetchall()
     else:
         sql = '''
@@ -400,22 +421,33 @@ def list_courses():
         LEFT JOIN timetable t ON c.id = t.course_id AND t.user_id = c.user_id
         LEFT JOIN teachers te ON t.teacher_id = te.id
         WHERE c.user_id = ?
-        GROUP BY c.id
-        ORDER BY c.created_at DESC, c.id DESC
         '''
-        courses = conn.execute(sql, (session['user_id'],)).fetchall()
+        params = [session['user_id']]
+        if department:
+            sql += ' AND c.department = ?'
+            params.append(department)
+        if selected_year is not None:
+            sql += ' AND c.year = ?'
+            params.append(selected_year)
+        if search:
+            sql += ' AND (c.name LIKE ? OR c.code LIKE ?)'
+            params.extend([f'%{search}%', f'%{search}%'])
+        sql += ' GROUP BY c.id ORDER BY c.year, c.code, c.name'
+        courses = conn.execute(sql, params).fetchall()
 
     return render_template(
-        'courses/list.html',
+        'courses/list_clean.html',
         courses=courses,
         department=department,
         departments=departments,
+        search=search,
+        selected_year=selected_year or '',
     )
 
 
 @courses_bp.route('/create', methods=['GET', 'POST'])
 @login_required
-@courses_timetable_admin_required
+@super_admin_required
 def create_course():
     conn = db.get_db()
     departments = _get_departments(conn)
@@ -455,14 +487,14 @@ def create_course():
             )
             conn.commit()
             flash('??? ????? ?????? ?????.', 'success')
-            return redirect(url_for('courses.list_courses'))
+            return _safe_redirect_to_courses()
 
     return render_template('courses/create.html', departments=departments, form_data=form_data)
 
 
 @courses_bp.route('/upload', methods=['POST'])
 @login_required
-@courses_timetable_admin_required
+@super_admin_required
 def upload_courses_excel():
     conn = db.get_db()
     departments = _get_departments(conn)
@@ -470,17 +502,17 @@ def upload_courses_excel():
 
     if not upload or not upload.filename:
         flash('يرجى اختيار ملف Excel للرفع.', 'danger')
-        return redirect(url_for('courses.list_courses'))
+        return _safe_redirect_to_courses()
 
     if not upload.filename.lower().endswith('.xlsx'):
         flash('صيغة الملف غير مدعومة. يرجى رفع ملف .xlsx فقط.', 'danger')
-        return redirect(url_for('courses.list_courses'))
+        return _safe_redirect_to_courses()
 
     try:
         rows, file_errors = _read_excel_rows(upload)
     except Exception:
         flash('تعذر قراءة ملف Excel. تأكد من أن الملف بصيغة .xlsx وصالح للقراءة.', 'danger')
-        return redirect(url_for('courses.list_courses'))
+        return _safe_redirect_to_courses()
     sanitized_rows, validation_errors = _validate_import_rows(conn, departments, rows)
     errors = file_errors + validation_errors
 
@@ -507,7 +539,7 @@ def upload_courses_excel():
 
 @courses_bp.route('/download')
 @login_required
-@courses_timetable_admin_required
+@super_admin_required
 def download_courses_excel():
     conn = db.get_db()
     if session.get('role') == 'super_admin':
@@ -567,7 +599,7 @@ def download_courses_excel():
 
 @courses_bp.route('/generate-code')
 @login_required
-@courses_timetable_admin_required
+@super_admin_required
 def generate_course_code():
     conn = db.get_db()
     department = request.args.get('department', '').strip()
@@ -582,7 +614,7 @@ def generate_course_code():
 
 @courses_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
-@courses_timetable_admin_required
+@super_admin_required
 def edit_course(id):
     conn = db.get_db()
     course = conn.execute('SELECT * FROM courses WHERE id = ?', (id,)).fetchone()
@@ -636,7 +668,7 @@ def edit_course(id):
             )
             conn.commit()
             flash('?? ????? ?????? ?????.', 'success')
-            return redirect(url_for('courses.list_courses'))
+            return _safe_redirect_to_courses()
 
     return render_template(
         'courses/edit.html',
@@ -648,17 +680,17 @@ def edit_course(id):
 
 @courses_bp.route('/<int:id>/delete', methods=['POST'])
 @login_required
-@courses_timetable_admin_required
+@super_admin_required
 def delete_course(id):
     if session.get('role') != 'super_admin':
         flash('??? ???? ?????? ??? ??? ??????.', 'danger')
-        return redirect(url_for('courses.list_courses'))
+        return _safe_redirect_to_courses()
 
     conn = db.get_db()
     course = conn.execute('SELECT * FROM courses WHERE id = ?', (id,)).fetchone()
     if not course:
         flash('?????? ??? ??????.', 'danger')
-        return redirect(url_for('courses.list_courses'))
+        return _safe_redirect_to_courses()
 
     db.add_history(
         conn,
@@ -672,4 +704,4 @@ def delete_course(id):
     conn.execute('DELETE FROM courses WHERE id = ?', (id,))
     conn.commit()
     flash('?? ??? ?????? ?????.', 'success')
-    return redirect(url_for('courses.list_courses'))
+    return _safe_redirect_to_courses()
