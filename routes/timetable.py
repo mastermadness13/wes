@@ -9,6 +9,7 @@ import db
 from routes import (
     courses_timetable_admin_required,
     current_department_name,
+    current_department_id,
     current_role,
     current_user_id,
     login_required,
@@ -710,9 +711,6 @@ def update_period_settings():
 @admin_department_required
 def list_timetable():
     conn = db.get_db()
-    if 'semester' in request.args:
-        session['selected_semesters'] = request.args.getlist('semester')
-
     all_departments = _fetch_departments(conn)
     dept_id_map = _department_id_map(conn)
     department_semester_map = {d['name']: d['semesters'] for d in all_departments}
@@ -728,7 +726,13 @@ def list_timetable():
     selected_department_name = dept_info['name'] if dept_info else ''
 
     allowed_semesters = _build_allowed_semesters(selected_department_name, department_semester_map)
-    selected_semesters_raw = request.args.getlist('semester') or session.get('selected_semesters', [])
+    
+    if 'semester' in request.args:
+        selected_semesters_raw = request.args.getlist('semester')
+        session['selected_semesters'] = selected_semesters_raw
+    else:
+        selected_semesters_raw = session.get('selected_semesters', [])
+
     selected_semesters = [int(value) for value in selected_semesters_raw if str(value).isdigit() and int(value) in allowed_semesters]
     if not selected_semesters:
         selected_semesters = [allowed_semesters[0]] if allowed_semesters else [1]
@@ -884,7 +888,7 @@ def export_timetable():
 
     for idx, r in enumerate(rows, 2):
         p_info = period_map.get(r['section'])
-        time_val = f"{r['start_time'] or p_info['start_time']} - {r['end_time'] or p_info['end_time']}" if p_info else ""
+        time_val = f"{r['start_time'] or p_info['start_time']} ← {r['end_time'] or p_info['end_time']}" if p_info else ""
         
         # Comprehensive conflict detection
         semester_overlap = slot_counts.get((r['day'], r['semester'], r['section']), 0) > 1
