@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}لوحة التحكم{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="page-title mb-4">
+        <div>
+            <h2 class="mb-1">لوحة التحكم</h2>
+            <p class="mb-0">مرحباً بك، {{ session.username }}!</p>
+        </div>
+    </div>
+
+    {% if is_super_admin %}
+    <div class="dashboard-grid mb-4">
+        <div class="summary-card">
+            <div class="d-flex align-items-center gap-3">
+                <div class="stat-icon-box stat-bg-users">
+                    <span class="icon-stat-users"></span>
+                </div>
+                <div class="flex-grow-1">
+                    <h4 class="mb-1">إجمالي المستخدمين</h4>
+                    <p class="mb-0 text-muted">المستخدمون المسجلون</p>
+                </div>
+                <h2 class="mb-0 text-primary">{{ total_users }}</h2>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="d-flex align-items-center gap-3">
+                <div class="stat-icon-box stat-bg-courses">
+                    <span class="icon-stat-courses"></span>
+                </div>
+                <div class="flex-grow-1">
+                    <h4 class="mb-1">إجمالي المقررات</h4>
+                    <p class="mb-0 text-muted">المقررات المضافة</p>
+                </div>
+                <h2 class="mb-0 text-success">{{ total_courses }}</h2>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="d-flex align-items-center gap-3">
+                <div class="stat-icon-box stat-bg-depts">
+                    <span class="icon-stat-depts"></span>
+                </div>
+                <div class="flex-grow-1">
+                    <h4 class="mb-1">إجمالي الأقسام</h4>
+                    <p class="mb-0 text-muted">الأقسام المسجلة</p>
+                </div>
+                <h2 class="mb-0 text-info">{{ total_departments }}</h2>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="d-flex align-items-center gap-3">
+                <div class="stat-icon-box stat-bg-teachers">
+                    <span class="icon-stat-teachers"></span>
+                </div>
+                <div class="flex-grow-1">
+                    <h4 class="mb-1">إجمالي المعلمين</h4>
+                    <p class="mb-0 text-muted">المعلمون المسجلون</p>
+                </div>
+                <h2 class="mb-0 text-warning">{{ total_teachers }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="page-card chart-container-card">
+                <h4 class="mb-4">توزيع المقررات حسب الأقسام</h4>
+                <div class="dashboard-bars">
+                    {% for item in course_distribution %}
+                    {% set width = ((item.count / max_course_distribution) * 100) if max_course_distribution else 0 %}
+                    {% set percentage = ((item.count / total_courses) * 100) if total_courses else 0 %}
+                    <div class="dashboard-bar-row">
+                        <div class="dashboard-bar-meta">
+                            <span class="dashboard-bar-label">{{ item.department or 'غير محدد' }}</span>
+                            <strong class="dashboard-bar-value">{{ item.count }}</strong>
+                        </div>
+                        <div class="dashboard-bar-track{% if percentage < 10 %} is-low{% endif %}" data-tooltip="{{ 'يشكل هذا القسم %.1f%% من إجمالي المقررات'|format(percentage) }}">
+                            <div class="dashboard-bar-fill" style="{{ 'width: %.2f%%; animation-delay: %.2fs;'|format(width, loop.index0 * 0.1) }}"></div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted mb-0">لا توجد بيانات متاحة حاليًا.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info" role="alert">
+        أنت مسؤول قسم ({{ department_name }}). يمكنك إدارة المقررات والجداول الزمنية الخاصة بقسمك.
+        عدد المقررات في قسمك: <strong>{{ department_courses }}</strong>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

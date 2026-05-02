@@ -1,9 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import check_password_hash
 import db
-from datetime import datetime
 
-from routes import login_required
+from routes import current_department_name, login_required
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -22,18 +21,22 @@ def login():
         password = request.form['password']
 
         conn = db.get_db()
-        user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        user = conn.execute(
+            'SELECT id, username, password, role, label, department_id FROM users WHERE username = ?',
+            (username,),
+        ).fetchone()
         if user and check_password_hash(user['password'], password):
+            department_id = user['department_id'] if 'department_id' in user.keys() else None
+            if user['role'] == 'admin' and department_id is None:
+                flash('هذا الحساب الإداري غير مرتبط بأي قسم. يرجى مراجعة المشرف العام.', 'danger')
+                return render_template('auth/login.html', hide_nav=True)
             session.clear()
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['role'] = user['role']
-            session['label'] = user['label']
-            if session['role'] != 'super_admin':
-                dept = conn.execute('SELECT DISTINCT department FROM courses WHERE user_id = ?', (user['id'],)).fetchone()
-                session['department'] = dept['department'] if dept else 'غير محدد'
-            else:
-                session['department'] = 'جميع الأقسام'
+            session['label'] = user['label'] or user['username']
+            if user['role'] == 'admin' and department_id is not None:
+                session['department_id'] = department_id
             flash('تم تسجيل الدخول بنجاح', 'success')
             return redirect(url_for('auth.dashboard'))
         flash('اسم المستخدم أو كلمة المرور غير صحيحة', 'danger')
@@ -52,69 +55,43 @@ def logout():
 @login_required
 def dashboard():
     conn = db.get_db()
-    day_names = {
-        0: 'الاثنين',  # Monday
-        1: 'الثلاثاء',
-        2: 'الأربعاء',
-        3: 'الخميس',
-        4: 'الجمعة',
-        5: 'السبت',
-        6: 'الأحد'
-    }
-    current_day = day_names[datetime.now().weekday()]
     if session.get('role') == 'super_admin':
-        users = conn.execute('SELECT * FROM users').fetchall()
-        counts = {
-            'users': conn.execute('SELECT COUNT(*) FROM users').fetchone()[0],
-            'students': conn.execute('SELECT COUNT(*) FROM students').fetchone()[0],
-            'teachers': conn.execute('SELECT COUNT(*) FROM teachers').fetchone()[0],
-            'courses': conn.execute('SELECT COUNT(*) FROM courses').fetchone()[0],
-            'timetable': conn.execute('SELECT COUNT(*) FROM timetable').fetchone()[0],
-            'departments': conn.execute('SELECT COUNT(*) FROM departments').fetchone()[0],
-            'admins': conn.execute('SELECT COUNT(*) FROM users WHERE role = "admin"').fetchone()[0],
-        }
-        # Get departments (assuming label is department)
-        departments = conn.execute('SELECT DISTINCT label as name FROM users WHERE label IS NOT NULL').fetchall()
-        admins = conn.execute('SELECT username FROM users WHERE role = "admin"').fetchall()
-        # Today lectures
-        today_lectures = conn.execute('''
-            SELECT t.*, c.name as course_name, te.name as teacher_name, r.name as room_name
-            FROM timetable t
-            JOIN courses c ON t.course_id = c.id
-            JOIN teachers te ON t.teacher_id = te.id
-            LEFT JOIN rooms r ON t.room_id = r.id
-            WHERE t.day = ?
-        ''', (current_day,)).fetchall()
-        recent_activity = conn.execute('''
-            SELECT c.name as course_name, te.name as teacher_name
-            FROM timetable t
-            JOIN courses c ON t.course_id = c.id
-            JOIN teachers te ON t.teacher_id = te.id
-            ORDER BY t.created_at DESC LIMIT 5
+        total_users = conn.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+        total_courses = conn.execute('SELECT COUNT(*) FROM courses').fetchone()[0]
+        total_departments = conn.execute('SELECT COUNT(*) FROM departments').fetchone()[0]
+        total_teachers = conn.execute('SELECT COUNT(*) FROM teachers').fetchone()[0]
+
+        # جلب توزيع المقررات للأعمدة البيانية
+        course_distribution = conn.execute('''
+            SELECT department, COUNT(*) as count 
+            FROM courses 
+            GROUP BY department 
+            ORDER BY count DESC
         ''').fetchall()
-        return render_template('dashboard/dashboard_admin.html', users=users, counts=counts, departments=departments, admins=admins, today_lectures=today_lectures, recent_activity=recent_activity)
+
+        course_dist_list = [dict(row) for row in course_distribution]
+        max_dist = max([row['count'] for row in course_dist_list]) if course_dist_list else 0
+
+        return render_template(
+            'auth/dashboard.html',
+            is_super_admin=True,
+            total_users=total_users,
+            total_courses=total_courses,
+            total_departments=total_departments,
+            total_teachers=total_teachers,
+            course_distribution=course_dist_list,
+            max_course_distribution=max_dist
+        )
     else:
-        counts = {
-            'students': conn.execute('SELECT COUNT(*) FROM students WHERE user_id = ?', (session['user_id'],)).fetchone()[0],
-            'teachers': conn.execute('SELECT COUNT(*) FROM teachers WHERE user_id = ?', (session['user_id'],)).fetchone()[0],
-            'courses': conn.execute('SELECT COUNT(*) FROM courses WHERE user_id = ?', (session['user_id'],)).fetchone()[0],
-            'timetable': conn.execute('SELECT COUNT(*) FROM timetable WHERE user_id = ?', (session['user_id'],)).fetchone()[0],
-        }
-        # Today lectures for user
-        today_lectures = conn.execute('''
-            SELECT t.*, c.name as course_name, te.name as teacher_name, r.name as room_name
-            FROM timetable t
-            JOIN courses c ON t.course_id = c.id
-            JOIN teachers te ON t.teacher_id = te.id
-            LEFT JOIN rooms r ON t.room_id = r.id
-            WHERE t.user_id = ? AND t.day = ?
-        ''', (session['user_id'], current_day)).fetchall()
-        recent_activity = conn.execute('''
-            SELECT c.name as course_name, te.name as teacher_name
-            FROM timetable t
-            JOIN courses c ON t.course_id = c.id
-            JOIN teachers te ON t.teacher_id = te.id
-            WHERE t.user_id = ?
-            ORDER BY t.created_at DESC LIMIT 5
-        ''', (session['user_id'],)).fetchall()
-        return render_template('dashboard/dashboard_user.html', counts=counts, today_lectures=today_lectures, recent_activity=recent_activity)
+        department_name = current_department_name(conn)
+        dept_courses = conn.execute(
+            'SELECT COUNT(*) FROM courses WHERE department = ?',
+            (department_name,)
+        ).fetchone()[0] if department_name else 0
+
+        return render_template(
+            'auth/dashboard.html',
+            is_super_admin=False,
+            department_name=department_name,
+            department_courses=dept_courses
+        )

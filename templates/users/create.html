@@ -1,5 +1,46 @@
 {% extends 'base.html' %}
 {% block content %}
-<style>.user-form-shell { max-width: 860px; margin: 0 auto; } .user-form-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); padding: 1.5rem; } .role-note { font-size: 0.9rem; color: var(--muted); }</style>
-<div class="user-form-shell"><div class="user-form-card"><h2 class="mb-1">Create User</h2><p class="role-note mb-4">Only the super admin can create accounts. Use <strong>Super Admin (admin = 0)</strong> for full access and <strong>Admin (admin = 1)</strong> for limited access.</p><form method="post"><div class="form-group"><label>Username</label><input class="form-control" name="username" required></div><div class="form-group"><label>Password</label><input type="password" class="form-control" name="password" required></div><div class="form-group"><label>Role</label><select class="form-control" name="role" required><option value="admin">Admin (admin = 1)</option><option value="super_admin">Super Admin (admin = 0)</option></select></div><div class="form-group"><label>Label / Department</label><input class="form-control" name="label" required></div><button class="btn btn-success" type="submit">Save</button></form></div></div>
+<div class="user-form-shell">
+  <div class="user-form-card">
+    <h2 class="mb-1">Create User</h2>
+    <p class="role-note mb-4">Only the super admin can create accounts. Admin accounts must be linked to a department.</p>
+
+    <form method="post">
+      <div class="form-group">
+        <label>Username</label>
+        <input class="form-control" name="username" required>
+      </div>
+
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" class="form-control" name="password" required>
+      </div>
+
+      <div class="form-group">
+        <label>Role</label>
+        <select class="form-control" name="role" required>
+          <option value="admin">Admin</option>
+          <option value="super_admin">Super Admin</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Label</label>
+        <input class="form-control" name="label" required value="{{ default_label or request.form.get('label', '') }}">
+      </div>
+
+      <div class="form-group">
+        <label>Department</label>
+        <select class="form-control" name="department_id">
+          <option value="">No department</option>
+          {% for dept in departments %}
+          <option value="{{ dept.id }}" {% if dept.id == (selected_department_id or (request.form.get('department_id')|int if request.form.get('department_id') else None)) %}selected{% endif %}>{{ dept.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <button class="btn btn-success" type="submit">Save</button>
+    </form>
+  </div>
+</div>
 {% endblock %}

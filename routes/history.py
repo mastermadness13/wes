@@ -53,6 +53,7 @@ def list_history():
         item['new_display'] = _display_history_value(item.get('new_value'))
         actor_name = item.get('actor_username') or item.get('actor_label') or 'System'
         item['actor_name'] = actor_name
+        item['is_system_error'] = (item['action'] == 'SYSTEM_ERROR')
         if not item.get('message'):
             verb = {'ADD': 'added', 'EDIT': 'updated', 'DELETE': 'deleted'}.get(item['action'], 'changed')
             item['message'] = f"{actor_name} {verb} {item['entity_type']} #{item['entity_id']}"

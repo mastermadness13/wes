@@ -27,7 +27,7 @@
           <tr>
             <th>#</th>
             <th>اسم المستخدم</th>
-            <th>التسمية</th>
+            <th>القسم</th>
             <th>الدور</th>
             <th>تاريخ الإنشاء</th>
             <th>الإجراءات</th>
@@ -41,7 +41,7 @@
             <td>{{ u.label }}</td>
             <td>
               <span class="role-pill {{ 'super' if u.role == 'super_admin' else 'admin' }}">
-                {{ 'Super Admin (admin = 0)' if u.role == 'super_admin' else 'Admin (admin = 1)' }}
+                {{ 'مشرف عام' if u.role == 'super_admin' else 'مشرف' }}
               </span>
             </td>
             <td>{{ u.created_at }}</td>

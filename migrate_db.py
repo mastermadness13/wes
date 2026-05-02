@@ -95,6 +95,7 @@ def migrate_timetable():
 
             # Recreate index
             conn.execute('CREATE INDEX IF NOT EXISTS idx_timetable_user_id ON timetable(user_id)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_timetable_lookup ON timetable(day, semester, section)')
 
         conn.commit()
         print("Migration completed successfully!")

@@ -16,7 +16,7 @@
         .table td, .table th { vertical-align: middle; }
     </style>
 </head>
-<body class="dark font-medium">
+<body class="dark font-medium{% if hide_nav %} auth-body{% endif %}">
     {% if not hide_nav %}
         {% include 'partials/navbar.html' %}
     {% endif %}
@@ -36,10 +36,13 @@
         {% block content %}{% endblock %}
     </div>
 
+    {% if not hide_nav %}
+    <button type="button" class="back-to-top no-print" id="backToTop" aria-label="العودة إلى الأعلى" data-haptic="medium">↑</button>
+    {% endif %}
+
     <script src="https://code.jquery.com/jquery-3.6.0.min.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
     <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
 </body>
 </html>
-
 

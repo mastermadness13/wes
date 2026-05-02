@@ -1,11 +1,11 @@
 function initCoursesList() {
-  const searchInput = document.getElementById('courseSearch');
+  const searchInput = document.getElementById('courseSearch') || document.getElementById('courseSearchQuery');
   const rows = Array.from(document.querySelectorAll('#coursesTable tbody tr.course-row'));
   const modalEl = document.getElementById('courseModal');
   const editForm = document.getElementById('courseEditForm');
   const deleteBtn = document.getElementById('courseDeleteBtn');
 
-  if (!searchInput || !rows.length || !modalEl || !editForm || !deleteBtn) return;
+  if (!rows.length || !modalEl || !editForm || !deleteBtn) return;
 
   const modal = window.jQuery ? window.jQuery(modalEl) : null;
   const clearActiveRows = () => rows.forEach((row) => row.classList.remove('active-row'));
@@ -37,23 +37,37 @@ function initCoursesList() {
     }
   }
 
-  searchInput.addEventListener('input', function () {
-    const query = this.value.trim().toLowerCase();
-    rows.forEach(function (row) {
-      row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none';
+  if (searchInput) {
+    searchInput.addEventListener('input', function () {
+      const query = this.value.trim().toLowerCase();
+      rows.forEach(function (row) {
+        row.style.display = row.innerText.toLowerCase().includes(query) ? '' : 'none';
+      });
     });
-  });
+  }
 
   rows.forEach(function (row) {
-    row.addEventListener('click', function () {
-      openModal(row);
-    });
-    row.addEventListener('keydown', function (event) {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
+    const editBtn = row.querySelector('.edit-course-btn');
+    const deleteRowBtn = row.querySelector('.delete-course-btn');
+
+    if (editBtn) {
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         openModal(row);
+      });
+    }
+
+    if (deleteRowBtn) {
+      deleteRowBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const courseId = row.dataset.courseId;
+        if (confirm('هل تريد حذف هذه المادة؟')) {
+          editForm.action = `${window.location.origin}/courses/${courseId}/delete`;
+          editForm.submit();
+        }
       }
-    });
+      );
+    }
   });
 
   deleteBtn.addEventListener('click', function () {
@@ -159,4 +173,3 @@ document.addEventListener('DOMContentLoaded', function () {
     initCourseCodeGeneration(courseId);
   }
 });
-

@@ -481,6 +481,19 @@ def _ensure_history_table(conn):
     )
 
 
+def _ensure_runtime_indexes(conn):
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_students_department ON students(department)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_teachers_department ON teachers(department)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_courses_department_year ON courses(department, year)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_courses_code ON courses(code)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_timetable_day_semester ON timetable(day, semester)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_timetable_course_id ON timetable(course_id)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_timetable_teacher_id ON timetable(teacher_id)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_timetable_room_id ON timetable(room_id)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_timetable_created_at ON timetable(created_at DESC)')
+    conn.execute('CREATE INDEX IF NOT EXISTS idx_attendance_student_date ON attendance(student_id, date)')
+
+
 def _serialize_history_value(value):
     if value is None:
         return None
@@ -516,6 +529,16 @@ def ensure_schema(conn=None):
         if 'notes' not in course_columns:
             conn.execute('ALTER TABLE courses ADD COLUMN notes TEXT')
 
+    if 'users' in existing_tables:
+        user_columns = _get_column_names(conn, 'users')
+        if 'department_id' not in user_columns:
+            conn.execute('ALTER TABLE users ADD COLUMN department_id INTEGER REFERENCES departments(id)')
+
+    if 'rooms' in existing_tables:
+        room_columns = _get_column_names(conn, 'rooms')
+        if 'department_id' not in room_columns:
+            conn.execute('ALTER TABLE rooms ADD COLUMN department_id INTEGER REFERENCES departments(id)')
+
     if 'history' in existing_tables:
         history_columns = _get_column_names(conn, 'history')
         if 'actor_user_id' not in history_columns:
@@ -527,6 +550,12 @@ def ensure_schema(conn=None):
 
     _ensure_periods_table(conn)
     _ensure_history_table(conn)
+    _ensure_runtime_indexes(conn)
+    # Ensure timetable has department_id to enforce department isolation
+    if 'timetable' in existing_tables:
+        tt_columns = _get_column_names(conn, 'timetable')
+        if 'department_id' not in tt_columns:
+            conn.execute('ALTER TABLE timetable ADD COLUMN department_id INTEGER REFERENCES departments(id)')
     conn.commit()
 
     if should_close:
@@ -599,6 +628,19 @@ def create_default_departments():
         )
         inserted += 1
 
+    default_department = db.execute(
+        'SELECT id, name FROM departments ORDER BY id LIMIT 1'
+    ).fetchone()
+    if default_department is not None:
+        db.execute(
+            '''
+            UPDATE users
+            SET department_id = ?, label = ?
+            WHERE role = 'admin' AND (department_id IS NULL OR department_id = '')
+            ''',
+            (default_department['id'], default_department['name']),
+        )
+
     db.commit()
     db.close()
     return inserted
@@ -668,6 +710,73 @@ def create_default_teachers():
     db.commit()
     db.close()
     return inserted
+
+
+def bootstrap_defaults():
+    db = sqlite3.connect(DATABASE)
+    _configure_connection(db)
+
+    ensure_schema(db)
+
+    from werkzeug.security import generate_password_hash
+
+    users = [
+        ('superadmin', generate_password_hash('admin123')),
+        ('admin', generate_password_hash('admin123')),
+    ]
+    for username, password in users:
+        exists = db.execute('SELECT 1 FROM users WHERE username = ?', (username,)).fetchone()
+        if not exists:
+            role = 'super_admin' if username == 'superadmin' else 'admin'
+            label = 'General Department' if username == 'superadmin' else 'Default Department'
+            db.execute(
+                'INSERT INTO users (username, password, role, label) VALUES (?, ?, ?, ?)',
+                (username, password, role, label),
+            )
+
+    for name, semesters, majors in DEFAULT_DEPARTMENTS:
+        exists = db.execute('SELECT 1 FROM departments WHERE name = ?', (name,)).fetchone()
+        if not exists:
+            db.execute(
+                'INSERT INTO departments (name, semesters, majors) VALUES (?, ?, ?)',
+                (name, semesters, majors),
+            )
+
+    default_department = db.execute(
+        'SELECT id, name FROM departments ORDER BY id LIMIT 1'
+    ).fetchone()
+    if default_department is not None:
+        db.execute(
+            '''
+            UPDATE users
+            SET department_id = ?, label = ?
+            WHERE role = 'admin' AND (department_id IS NULL OR department_id = '')
+            ''',
+            (default_department['id'], default_department['name']),
+        )
+
+    for name, name_ar, type_, status, capacity, location in DEFAULT_ROOMS:
+        exists = db.execute('SELECT 1 FROM rooms WHERE name = ?', (name,)).fetchone()
+        if not exists:
+            db.execute(
+                '''
+                INSERT INTO rooms (name, name_ar, type, status, capacity, location)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ''',
+                (name, name_ar, type_, status, capacity, location),
+            )
+
+    super_admin = db.execute(
+        "SELECT id FROM users WHERE username = ? OR role = 'super_admin' ORDER BY id LIMIT 1",
+        ('superadmin',),
+    ).fetchone()
+    if super_admin is not None:
+        _seed_default_courses(db, super_admin['id'])
+        _rebalance_default_courses(db, super_admin['id'])
+        _seed_default_teachers(db, super_admin['id'])
+
+    db.commit()
+    db.close()
 
 
 def add_history(

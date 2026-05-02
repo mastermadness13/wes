@@ -1,5 +1,45 @@
 {% extends 'base.html' %}
 {% block content %}
-<style>.user-form-shell { max-width: 860px; margin: 0 auto; } .user-form-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); padding: 1.5rem; } .role-note { font-size: 0.9rem; color: var(--muted); }</style>
-<div class="user-form-shell"><div class="user-form-card"><h2 class="mb-1">Edit User</h2><p class="role-note mb-4">Super admin has full system access. Normal admin is limited to course and timetable management.</p><form method="post"><div class="form-group"><label>Username</label><input value="{{ user.username }}" class="form-control" name="username" required></div><div class="form-group"><label>Role</label><select class="form-control" name="role"><option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin (admin = 1)</option><option value="super_admin" {% if user.role == 'super_admin' %}selected{% endif %}>Super Admin (admin = 0)</option></select></div><div class="form-group"><label>Label / Department</label><input value="{{ user.label }}" class="form-control" name="label" required></div><button class="btn btn-primary" type="submit">Update</button></form></div></div>
+<div class="user-form-shell">
+  <div class="user-form-card">
+    <h2 class="mb-1">تعديل المستخدم</h2>
+    <p class="role-note mb-4">يمكن للمشرف العام تعديل الدور وربط القسم، بينما يستطيع المستخدم العادي تعديل بياناته الأساسية فقط.</p>
+
+    <form method="post">
+      <div class="form-group">
+        <label>اسم المستخدم</label>
+        <input value="{{ user.username }}" class="form-control" name="username" required>
+      </div>
+
+      {% if session.get('role') == 'super_admin' %}
+      <div class="form-group">
+        <label>الدور</label>
+        <select class="form-control" name="role">
+          <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>أدمن</option>
+          <option value="super_admin" {% if user.role == 'super_admin' %}selected{% endif %}>سوبر أدمن</option>
+        </select>
+      </div>
+      {% endif %}
+
+      <div class="form-group">
+        <label>الاسم الظاهر</label>
+        <input value="{{ user.label }}" class="form-control" name="label" required>
+      </div>
+
+      {% if session.get('role') == 'super_admin' %}
+      <div class="form-group">
+        <label>ربط القسم</label>
+        <select class="form-control" name="department_id">
+          <option value="">No department</option>
+          {% for dept in departments %}
+          <option value="{{ dept.id }}" {% if user.department_id == dept.id %}selected{% endif %}>{{ dept.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <button class="btn btn-primary" type="submit">حفظ التعديلات</button>
+    </form>
+  </div>
+</div>
 {% endblock %}

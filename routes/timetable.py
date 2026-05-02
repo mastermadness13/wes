@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from io import BytesIO
 
 from flask import Blueprint, flash, g, jsonify, redirect, render_template, request, send_file, session, url_for
@@ -20,7 +20,7 @@ from routes.access import admin_department_required, department_name_allowed, is
 
 timetable_bp = Blueprint('timetable', __name__)
 
-DAY_NAMES = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس']
+DAY_NAMES = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس']
 DAY_LABELS = {day: day for day in DAY_NAMES}
 
 
@@ -126,14 +126,23 @@ def _periods_from_form(form):
 def _build_allowed_semesters(selected_department_name, department_semester_map):
     fallback = [1, 2, 3, 4, 5, 6, 7]
     if selected_department_name and selected_department_name in department_semester_map:
-        max_sem = max(1, int(department_semester_map[selected_department_name]))
+        try:
+            max_sem = max(1, int(department_semester_map[selected_department_name]))
+        except Exception:
+            max_sem = 1
         return list(range(1, max_sem + 1))
+
     if department_semester_map:
         values = set()
-        for max_sem in department_semester_map.values():
-            values.update(range(1, max(1, int(max_sem)) + 1))
+        for max_sem_raw in department_semester_map.values():
+            try:
+                max_sem = max(1, int(max_sem_raw))
+            except Exception:
+                continue
+            values.update(range(1, max_sem + 1))
         if values:
             return sorted(values)
+
     return fallback
 
 
@@ -181,10 +190,11 @@ def _selected_department_name(conn, fallback=None):
 def _fetch_scoped_resources(conn, table_name, include_all=False, owner_user_id=None, department_name=None):
     """Unified helper to fetch courses or teachers with correct scoping."""
     params = []
+    department_name = (department_name or '').strip()
     is_courses = (table_name == 'courses')
     order_by = 'department, year, name' if is_courses else 'department, name'
     # Teachers allow NULL/empty departments for "general" teachers
-    dept_clause = "department = ?" if is_courses else "(department = ? OR department IS NULL OR TRIM(department) = '')"
+    dept_clause = "LOWER(TRIM(department)) = LOWER(TRIM(?))" if is_courses else "(LOWER(TRIM(department)) = LOWER(TRIM(?)) OR department IS NULL OR TRIM(department) = '')"
 
     if include_all:
         sql = f"SELECT t.*, u.username AS owner_username, u.label AS owner_label FROM {table_name} t LEFT JOIN users u ON u.id = t.user_id"
@@ -218,21 +228,24 @@ def _fetch_rooms(conn):
 
 
 def _entry_with_relations(conn, entry_id):
-    return conn.execute(
+    row = conn.execute(
         """
         SELECT t.*, c.name AS course_name, c.department AS course_department,
                te.name AS teacher_name,
                r.name AS room_name, r.name_ar AS room_name_ar,
-               u.username AS owner_username, u.label AS owner_label
+               u.username AS owner_username, u.label AS owner_label,
+               d.id AS department_id, d.name AS department_name
         FROM timetable t
         JOIN courses c ON c.id = t.course_id
         JOIN teachers te ON te.id = t.teacher_id
         JOIN rooms r ON r.id = t.room_id
         LEFT JOIN users u ON u.id = t.user_id
+        LEFT JOIN departments d ON d.id = t.department_id
         WHERE t.id = ?
         """,
         (entry_id,),
     ).fetchone()
+    return dict(row) if row else None
 
 
 def _can_access_entry(conn, entry):
@@ -279,6 +292,9 @@ def _is_resource_accessible(conn, table_name, resource_id, owner_user_id):
     if not row:
         return False
 
+    # convert to dict for safe .get() usage
+    r = dict(row)
+
     if is_super_admin():
         return True
 
@@ -287,13 +303,13 @@ def _is_resource_accessible(conn, table_name, resource_id, owner_user_id):
         return True
 
     # Teachers and Courses use 'department' name and 'user_id' for ownership/scoping
-    dept_name = (row.get('department') or '').strip()
+    dept_name = (r.get('department') or '').strip()
 
     # Special rule: Teachers with no department are "general" and accessible to everyone
     if table_name == 'teachers' and not dept_name:
         return True
 
-    return row.get('user_id') == owner_user_id or department_name_allowed(dept_name, conn)
+    return r.get('user_id') == owner_user_id or department_name_allowed(dept_name, conn)
 
 
 def _validate_owner_resources(conn, owner_user_id, course_id, teacher_id, room_id):
@@ -328,6 +344,7 @@ def _validate_schedule_conflicts(
     semester,
     period_code,
     teacher_id,
+    department_id,
     room_id,
     exclude_entry_id=None,
     start_time=None,
@@ -342,24 +359,24 @@ def _validate_schedule_conflicts(
     if not target_start or not target_end or _minutes(target_start) >= _minutes(target_end):
         return 'النطاق الزمني المختار غير صالح.'
 
-    # Check for unique constraint: (user_id, day, semester, section)
-    # A user cannot have two entries for the exact same day, semester, and period.
-    current_user = current_user_id()
-    unique_check_sql = """
+    # 1. Structural conflict: One slot per department per semester
+    sql_dept = """
         SELECT t.id, c.name AS course_name 
         FROM timetable t 
         JOIN courses c ON c.id = t.course_id
-        WHERE t.user_id = ? AND t.day = ? AND t.semester = ? AND t.section = ?
+        WHERE t.department_id = ? 
+        AND t.day = ? AND t.semester = ? AND t.section = ?
     """
-    unique_check_params = [current_user, day, semester, period_code]
+    params_dept = [department_id, day, semester, period_code]
     if exclude_entry_id is not None:
-        unique_check_sql += ' AND t.id != ?'
-        unique_check_params.append(exclude_entry_id)
+        sql_dept += ' AND t.id != ?'
+        params_dept.append(exclude_entry_id)
     
-    existing_own = conn.execute(unique_check_sql, unique_check_params).fetchone()
-    if existing_own:
-        return f"لديك بالفعل حصة مسجلة (مقرر: {existing_own['course_name']}) في هذا اليوم وهذا الفصل وهذه الفترة."
+    conflict_dept = conn.execute(sql_dept, params_dept).fetchone()
+    if conflict_dept:
+        return f"هناك حصة مسجلة مسبقاً لهذا القسم (مقرر: {conflict_dept['course_name']}) في هذا اليوم والفترة."
 
+    # 2. Resource conflicts: Teacher/Room overlaps (global)
     sql = """
         SELECT t.id, t.section, t.teacher_id, t.room_id, t.start_time, t.end_time,
                c.name AS course_name, te.name AS teacher_name, 
@@ -389,6 +406,22 @@ def _validate_schedule_conflicts(
     return None
 
 
+def check_timetable_conflict(conn, department_id, day, semester, section, exclude_id=None):
+    """Return a conflicting timetable row for the given department_id/day/semester/section, or None."""
+    sql = """
+        SELECT t.id, c.name AS course_name
+        FROM timetable t
+        JOIN courses c ON c.id = t.course_id
+        WHERE t.department_id = ?
+          AND t.day = ? AND t.semester = ? AND t.section = ?
+    """
+    params = [department_id, day, semester, section]
+    if exclude_id is not None:
+        sql += ' AND t.id != ?'
+        params.append(exclude_id)
+    return conn.execute(sql, params).fetchone()
+
+
 def _process_timetable_save(conn, entry_id, data):
     """Common logic for creating or updating a timetable entry."""
     day = (data.get('day') or '').strip()
@@ -397,55 +430,201 @@ def _process_timetable_save(conn, entry_id, data):
     course_id = _safe_int(data.get('course_id'))
     teacher_id = _safe_int(data.get('teacher_id'))
     room_id = _safe_int(data.get('room_id'))
+    # department_id must be provided by the form; fallback to course's department id or current user's department
+    department_id = _safe_int(data.get('department_id'))
     owner_user_id = current_user_id()
 
-    if not all([day, semester is not None, period_code, course_id, teacher_id, room_id]):
-        return None, 'جميع الحقول مطلوبة.'
+    try:
+        # BEGIN IMMEDIATE to prevent race conditions during write operations
+        conn.execute("BEGIN IMMEDIATE")
 
-    submitted_start_time = (data.get('start_time') or '').strip() or None
-    submitted_end_time = (data.get('end_time') or '').strip() or None
+        # 1. Resource existence & metadata validation (Fetch ONCE)
+        course_row = conn.execute('SELECT id, department, name, user_id FROM courses WHERE id = ?', (course_id,)).fetchone()
+        teacher_row = conn.execute('SELECT id, name, department, user_id FROM teachers WHERE id = ?', (teacher_id,)).fetchone()
+        room_row = conn.execute('SELECT id, name FROM rooms WHERE id = ?', (room_id,)).fetchone()
 
-    # Determine final storage (NULL if default period time)
-    period_lookup = _period_map(conn)
-    final_start_time = submitted_start_time
-    final_end_time = submitted_end_time
-    p_details = period_lookup.get(period_code)
-    if p_details and submitted_start_time == p_details['start_time'] and submitted_end_time == p_details['end_time']:
-        final_start_time = None
-        final_end_time = None
+        # normalize sqlite3.Row to dict for safe attribute access using .get()
+        if course_row:
+            course_row = dict(course_row)
+        if teacher_row:
+            teacher_row = dict(teacher_row)
+        if room_row:
+            room_row = dict(room_row)
 
-    resource_error = _validate_owner_resources(conn, owner_user_id, course_id, teacher_id, room_id)
-    if resource_error:
-        return None, resource_error
+        if not course_row:
+            conn.rollback()
+            return None, 'المقرر المختار غير موجود.'
+        if teacher_id and not teacher_row:
+            conn.rollback()
+            return None, 'المدرس المختار غير موجود.'
+        if room_id and not room_row:
+            conn.rollback()
+            return None, 'القاعة المختارة غير موجودة.'
 
-    conflict_error = _validate_schedule_conflicts(
-        conn, day=day, semester=semester, period_code=period_code,
-        teacher_id=teacher_id, room_id=room_id, exclude_entry_id=entry_id,
-        start_time=submitted_start_time, end_time=submitted_end_time
-    )
-    if conflict_error:
-        return None, conflict_error
+        # 2. Accessibility Checks (Inline to avoid duplicate SQL)
+        if not is_super_admin():
+            if not department_name_allowed(course_row['department'], conn):
+                conn.rollback()
+                return None, 'المقرر المختار غير متاح لقسمك.'
+            t_dept = (teacher_row['department'] or '').strip() if teacher_row else ''
+            if t_dept and not department_name_allowed(t_dept, conn):
+                conn.rollback()
+                return None, 'المدرس المختار غير متاح لقسمك.'
 
-    if entry_id:  # EDIT MODE
-        old_entry = _entry_with_relations(conn, entry_id)
-        if not old_entry:
-            return None, 'الحصة غير موجودة.'
-        conn.execute(
-            'UPDATE timetable SET user_id=?, day=?, semester=?, section=?, course_id=?, teacher_id=?, room_id=?, start_time=?, end_time=? WHERE id=?',
-            (owner_user_id, day, semester, period_code, course_id, teacher_id, room_id, final_start_time, final_end_time, entry_id)
-        )
-        updated = _entry_with_relations(conn, entry_id)
-        db.add_history(conn, 'EDIT', 'timetable', entry_id, *_history_actor(), message=_timetable_history_message('EDIT', dict(updated)), old_value=dict(old_entry), new_value=dict(updated))
-        return updated, None
-    else:  # CREATE MODE
-        cursor = conn.execute(
-            'INSERT INTO timetable (user_id, day, semester, section, course_id, teacher_id, room_id, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            (owner_user_id, day, semester, period_code, course_id, teacher_id, room_id, final_start_time, final_end_time)
-        )
-        new_id = cursor.lastrowid
-        added = _entry_with_relations(conn, new_id)
-        db.add_history(conn, 'ADD', 'timetable', new_id, *_history_actor(), message=_timetable_history_message('ADD', dict(added)), new_value=dict(added))
-        return added, None
+        if not all([day, semester is not None, period_code, course_id, teacher_id, room_id]):
+            conn.rollback()
+            return None, 'جميع الحقول مطلوبة.'
+
+        # Resolve missing department_id from course's department name if not provided
+        if not department_id:
+            course_dept = (course_row.get('department') or '').strip()
+            if course_dept:
+                dept_row = conn.execute('SELECT id FROM departments WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1', (course_dept,)).fetchone()
+                if dept_row:
+                    department_id = dept_row['id']
+
+        # Final fallback: use current user's department when allowed
+        if not department_id:
+            department_id = current_department_id()
+
+        # Enforce department scoping: non-super admins can only operate within their department
+        if not is_super_admin():
+            if department_id != current_department_id():
+                conn.rollback()
+                return None, 'غير مسموح لك بإجراء عمليات خارج قسمك.'
+
+        submitted_start_time = (data.get('start_time') or '').strip() or None
+        submitted_end_time = (data.get('end_time') or '').strip() or None
+
+        # Determine final storage (NULL if default period time)
+        period_lookup = _period_map(conn)
+        final_start_time = submitted_start_time
+        final_end_time = submitted_end_time
+        p_details = period_lookup.get(period_code)
+        if p_details and submitted_start_time == p_details['start_time'] and submitted_end_time == p_details['end_time']:
+            final_start_time = None
+            final_end_time = None
+
+        # Allow caller to force save (bypass conflict detection) by passing `force_save` in the form data
+        force_save_flag = str(data.get('force_save') or '').lower() in {'1', 'on', 'true', 'yes'}
+        
+        conflict_error = None
+        if not force_save_flag:
+            conflict_error = _validate_schedule_conflicts(
+                conn, day=day, semester=semester, period_code=period_code, department_id=department_id,
+                teacher_id=teacher_id, room_id=room_id, exclude_entry_id=entry_id,
+                start_time=submitted_start_time, end_time=submitted_end_time
+            )
+            if conflict_error:
+                conn.rollback()
+                return None, conflict_error
+
+            if entry_id:  # EDIT MODE
+                old_entry = _entry_with_relations(conn, entry_id)
+                if not old_entry:
+                    conn.rollback()
+                    return None, 'الحصة غير موجودة.'
+                conn.execute(
+                    'UPDATE timetable SET user_id=?, day=?, semester=?, section=?, course_id=?, teacher_id=?, room_id=?, start_time=?, end_time=?, department_id=? WHERE id=?',
+                    (owner_user_id, day, semester, period_code, course_id, teacher_id, room_id, final_start_time, final_end_time, department_id, entry_id)
+                )
+                updated = _entry_with_relations(conn, entry_id)
+                db.add_history(conn, 'EDIT', 'timetable', entry_id, *_history_actor(), message=_timetable_history_message('EDIT', dict(updated)), old_value=dict(old_entry), new_value=dict(updated))
+                return updated, None
+            else:  # CREATE MODE
+                # Prevent DB-level UNIQUE constraint from raising by checking for
+                # an existing timetable row with same user/day/semester/section.
+                existing = conn.execute(
+                    'SELECT id FROM timetable WHERE user_id=? AND day=? AND semester=? AND section=?',
+                    (owner_user_id, day, semester, period_code)
+                ).fetchone()
+
+                if existing:
+                    # Extract id from row object
+                    existing_id = None
+                    try:
+                        existing_id = existing['id']
+                    except Exception:
+                        try:
+                            existing_id = existing[0]
+                        except Exception:
+                            existing_id = None
+
+                    # If caller requested a force save, replace the existing entry
+                    if force_save_flag and existing_id:
+                        conn.execute(
+                            'UPDATE timetable SET user_id=?, day=?, semester=?, section=?, course_id=?, teacher_id=?, room_id=?, start_time=?, end_time=?, department_id=? WHERE id=?',
+                            (owner_user_id, day, semester, period_code, course_id, teacher_id, room_id, final_start_time, final_end_time, department_id, existing_id)
+                        )
+                        updated = _entry_with_relations(conn, existing_id)
+                        db.add_history(conn, 'EDIT', 'timetable', existing_id, *_history_actor(), message=_timetable_history_message('EDIT', dict(updated)), old_value=None, new_value=dict(updated))
+                        return updated, None
+                    else:
+                        conn.rollback()
+                        # Signal special redirect to caller with existing id when available
+                        if existing_id:
+                            return None, f'EXISTING:{existing_id}'
+                        return None, 'يوجد صف بالفعل بنفس المستخدم، اليوم، والترتيب (القسم). استخدم التعديل أو فعّل Force Save لتجاوز ذلك.'
+
+                cursor = conn.execute(
+                    'INSERT INTO timetable (user_id, day, semester, section, course_id, teacher_id, room_id, start_time, end_time, department_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    (owner_user_id, day, semester, period_code, course_id, teacher_id, room_id, final_start_time, final_end_time, department_id)
+                )
+                new_id = cursor.lastrowid
+                added = _entry_with_relations(conn, new_id)
+                db.add_history(conn, 'ADD', 'timetable', new_id, *_history_actor(), message=_timetable_history_message('ADD', dict(added)), new_value=dict(added))
+                return added, None
+        # If caller requested force_save we still need to perform the update/insert
+        # operations but skip conflict detection above. Ensure we return a tuple
+        # so callers can unpack the result.
+        if force_save_flag:
+            if entry_id:  # EDIT MODE (force replace)
+                old_entry = _entry_with_relations(conn, entry_id)
+                if not old_entry:
+                    conn.rollback()
+                    return None, 'الحصة غير موجودة.'
+                conn.execute(
+                    'UPDATE timetable SET user_id=?, day=?, semester=?, section=?, course_id=?, teacher_id=?, room_id=?, start_time=?, end_time=?, department_id=? WHERE id=?',
+                    (owner_user_id, day, semester, period_code, course_id, teacher_id, room_id, final_start_time, final_end_time, department_id, entry_id)
+                )
+                updated = _entry_with_relations(conn, entry_id)
+                db.add_history(conn, 'EDIT', 'timetable', entry_id, *_history_actor(), message=_timetable_history_message('EDIT', dict(updated)), old_value=dict(old_entry), new_value=dict(updated))
+                return updated, None
+            else:  # CREATE MODE (force insert or replace existing)
+                existing = conn.execute(
+                    'SELECT id FROM timetable WHERE user_id=? AND day=? AND semester=? AND section=?',
+                    (owner_user_id, day, semester, period_code)
+                ).fetchone()
+                existing_id = None
+                if existing:
+                    try:
+                        existing_id = existing['id']
+                    except Exception:
+                        try:
+                            existing_id = existing[0]
+                        except Exception:
+                            existing_id = None
+
+                if existing_id:
+                    conn.execute(
+                        'UPDATE timetable SET user_id=?, day=?, semester=?, section=?, course_id=?, teacher_id=?, room_id=?, start_time=?, end_time=?, department_id=? WHERE id=?',
+                        (owner_user_id, day, semester, period_code, course_id, teacher_id, room_id, final_start_time, final_end_time, department_id, existing_id)
+                    )
+                    updated = _entry_with_relations(conn, existing_id)
+                    db.add_history(conn, 'EDIT', 'timetable', existing_id, *_history_actor(), message=_timetable_history_message('EDIT', dict(updated)), old_value=None, new_value=dict(updated))
+                    return updated, None
+
+                cursor = conn.execute(
+                    'INSERT INTO timetable (user_id, day, semester, section, course_id, teacher_id, room_id, start_time, end_time, department_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    (owner_user_id, day, semester, period_code, course_id, teacher_id, room_id, final_start_time, final_end_time, department_id)
+                )
+                new_id = cursor.lastrowid
+                added = _entry_with_relations(conn, new_id)
+                db.add_history(conn, 'ADD', 'timetable', new_id, *_history_actor(), message=_timetable_history_message('ADD', dict(added)), new_value=dict(added))
+                return added, None
+    except Exception as e:
+        conn.rollback()
+        raise e
 
 
 def _ensure_selection(records, selected_id, conn, table_name):
@@ -469,7 +648,7 @@ def _room_availability_rows(conn, day, semester, period_code, exclude_entry_id=N
         SELECT t.room_id, c.name as course_name, d.name as dept_name, t.section, t.start_time, t.end_time, t.id
         FROM timetable t
         JOIN courses c ON c.id = t.course_id
-        JOIN departments d ON d.name = c.department
+        LEFT JOIN departments d ON d.id = t.department_id
         WHERE t.day = ? AND t.semester = ?
     """
     entries = conn.execute(sql, (day, semester)).fetchall()
@@ -510,9 +689,10 @@ def _available_teachers_detailed(conn, day, semester, period_code, owner_user_id
     target_start, target_end = _resolve_time_range(period_lookup, period_code, start_time, end_time)
     
     sql = """
-        SELECT t.teacher_id, c.name as course_name, t.semester as sem, t.section, t.start_time, t.end_time, t.id
+        SELECT t.teacher_id, c.name as course_name, t.semester as sem, t.section, t.start_time, t.end_time, t.id, d.name as dept_name
         FROM timetable t
         JOIN courses c ON c.id = t.course_id
+        LEFT JOIN departments d ON d.id = t.department_id
         WHERE t.day = ? AND t.semester = ?
     """
     entries = conn.execute(sql, (day, semester)).fetchall()
@@ -524,7 +704,7 @@ def _available_teachers_detailed(conn, day, semester, period_code, owner_user_id
         
         e_start, e_end = _resolve_time_range(period_lookup, entry['section'], entry['start_time'], entry['end_time'])
         if _time_ranges_overlap(target_start, target_end, e_start, e_end):
-            conflicts[entry['teacher_id']] = f"مشغول مع {entry['course_name']} (فصل {entry['sem']})"
+            conflicts[entry['teacher_id']] = f"مشغول مع {entry['course_name']} (فصل {entry['sem']}) — {(entry['dept_name'] or '')}"
 
     results = []
     for t in teachers:
@@ -564,9 +744,10 @@ def available_rooms():
     semester = _safe_int(request.args.get('semester'))
     period_code = (request.args.get('section') or request.args.get('period_code') or '').strip()
     exclude_id = _safe_int(request.args.get('exclude_id'))
+    department_id = _safe_int(request.args.get('department_id'))
     if not day or semester is None or not period_code:
         return jsonify({'rooms': [], 'error': 'day, semester, period_code are required'}), 400
-    return jsonify({'rooms': _room_availability_rows(conn, day, semester, period_code, exclude_entry_id=exclude_id)})
+    return jsonify({'rooms': _room_availability_rows(conn, day, semester, period_code, exclude_entry_id=exclude_id, start_time=request.args.get('start_time'), end_time=request.args.get('end_time'))})
 
 
 @timetable_bp.route('/available-teachers')
@@ -582,7 +763,8 @@ def available_teachers():
     if not day or semester is None or not period_code:
         return jsonify({'teachers': [], 'error': 'day, semester, period_code are required'}), 400
     dept_name = _selected_department_name(conn)
-    teachers = _available_teachers(conn, day, semester, period_code, current_user_id(), exclude_entry_id=exclude_id, department_name=dept_name)
+    department_id = _safe_int(request.args.get('department_id')) or _selected_department_id()
+    teachers = _available_teachers(conn, day, semester, period_code, current_user_id(), exclude_entry_id=exclude_id, start_time=request.args.get('start_time'), end_time=request.args.get('end_time'), department_name=dept_name)
     return jsonify({'teachers': teachers})
 
 
@@ -595,6 +777,9 @@ def timetable_form(id):
     entry = None
     if id:
         entry = _entry_with_relations(conn, id)
+        if not entry:
+            flash('الحصة غير موجودة.', 'danger')
+            return redirect(url_for('timetable.list_timetable'))
         if not _can_access_entry(conn, entry):
             flash('غير مسموح لك بتعديل هذه الحصة.', 'danger')
             return redirect(url_for('timetable.list_timetable'))
@@ -606,6 +791,16 @@ def timetable_form(id):
     if request.method == 'POST':
         result, error = _process_timetable_save(conn, id, request.form)
         if error:
+            # Special signal: EXISTING:<id> -> redirect user to edit that existing entry
+            if isinstance(error, str) and error.startswith('EXISTING:'):
+                try:
+                    existing_id = int(error.split(':', 1)[1])
+                except Exception:
+                    flash('يوجد صف متعارض بالفعل.', 'warning')
+                    return redirect(request.url)
+                flash('يوجد صف موجود لنفس المستخدم؛ افتح التعديل لضبطه أو فعّل Force Save.', 'warning')
+                return redirect(url_for('timetable.timetable_form', id=existing_id))
+
             flash(error, 'danger')
             return redirect(request.url)
 
@@ -618,25 +813,49 @@ def timetable_form(id):
 
     # GET REQUEST - Render Form
     enabled_periods = _get_periods(conn, enabled_only=True)
-    
+
     # Pre-fill logic
+    # Determine selected department early so we can pick a sensible default semester
+    dept_id = _selected_department_id() or (entry.get('department_id') if entry else None)
+
+    # Default semester behavior:
+    # - If editing an entry, preserve its semester.
+    # - Otherwise, if the selected department has more than one semester, default to semester 2.
+    default_sem_fallback = entry['semester'] if entry else 1
+    if not entry and dept_id:
+        dept_info = _department_id_map(conn).get(dept_id)
+        dept_semesters = 0
+        if dept_info and dept_info.get('semesters') and str(dept_info.get('semesters')).isdigit():
+            try:
+                dept_semesters = int(dept_info.get('semesters'))
+            except Exception:
+                dept_semesters = 0
+        if dept_semesters > 1:
+            default_sem_fallback = 2
+
+    d_sem = _safe_int(request.values.get('semester'), default_sem_fallback)
+    required_year = (d_sem + 1) // 2
     d_day = request.args.get('day', entry['day'] if entry else DAY_NAMES[0])
-    d_sem = _safe_int(request.args.get('semester'), entry['semester'] if entry else 1)
     d_period = request.args.get('section', entry['section'] if entry else (enabled_periods[0]['code'] if enabled_periods else 'A'))
-    
+
     f_start = entry['start_time'] if entry else None
     f_end = entry['end_time'] if entry else None
-    if not f_start or not f_end:
-        p_map = _period_map(conn)
-        p_det = p_map.get(d_period)
-        if p_det:
-            f_start, f_end = p_det['start_time'], p_det['end_time']
 
-    dept_id = _selected_department_id() or (entry['department_id'] if entry else None)
-    dept_name = _selected_department_name(conn, fallback=entry['course_department'] if entry else None)
-    dept_filter = dept_name if is_super_admin() else _scoped_department_name(conn)
+    # NEW: Standardized Department Filtering
+    # capture selected department name as well for form rendering
+    if is_super_admin():
+        dept_name = request.args.get('department_name') or _selected_department_name(conn)
+    else:
+        dept_name = _scoped_department_name(conn)
+    
+    dept_filter = (dept_name or '').strip()
 
-    courses = _fetch_courses(conn, include_all=is_super_admin(), owner_user_id=current_user_id(), department_name=dept_filter)
+    all_dept_courses = _fetch_courses(conn, include_all=is_super_admin(), owner_user_id=current_user_id(), department_name=dept_filter)
+    courses = [c for c in all_dept_courses if c['year'] == required_year]
+    
+    # Debug Info
+    print(f"[DEBUG] Sem: {d_sem} | Yr: {required_year} | Dept: {dept_filter} | Courses: {len(courses)}/{len(all_dept_courses)}")
+
     initial_rooms = _room_availability_rows(conn, d_day, d_sem, d_period, exclude_entry_id=id, start_time=f_start, end_time=f_end)
     initial_teachers = _available_teachers(conn, d_day, d_sem, d_period, current_user_id(), exclude_entry_id=id, start_time=f_start, end_time=f_end, department_name=dept_name)
 
@@ -657,6 +876,7 @@ def timetable_form(id):
         next_url=next_url,
         selected_department_id=dept_id,
         selected_department_name=dept_name
+        , hide_nav=is_modal
     )
 
 
@@ -716,9 +936,9 @@ def list_timetable():
     department_semester_map = {d['name']: d['semesters'] for d in all_departments}
 
     if is_super_admin():
+        # Allow super admins to view all departments by leaving selection empty.
+        # Only use an explicit department_id when provided in the request.
         selected_department_id = _selected_department_id()
-        if selected_department_id is None and all_departments:
-            selected_department_id = all_departments[0]['id']
     else:
         selected_department_id = current_department_id()
 
@@ -735,7 +955,18 @@ def list_timetable():
 
     selected_semesters = [int(value) for value in selected_semesters_raw if str(value).isdigit() and int(value) in allowed_semesters]
     if not selected_semesters:
-        selected_semesters = [allowed_semesters[0]] if allowed_semesters else [1]
+        # If a specific department is selected and that department has >1 semesters, prefer semester 2 when available
+        dept_info = dept_id_map.get(selected_department_id)
+        dept_semesters = 0
+        if dept_info and dept_info.get('semesters') and str(dept_info.get('semesters')).isdigit():
+            try:
+                dept_semesters = int(dept_info.get('semesters'))
+            except Exception:
+                dept_semesters = 0
+        if selected_department_id and dept_semesters > 1 and 2 in allowed_semesters:
+            selected_semesters = [2]
+        else:
+            selected_semesters = [allowed_semesters[0]] if allowed_semesters else [1]
 
     search = (request.args.get('q') or '').strip()
     enabled_periods = _get_periods(conn, enabled_only=True)
@@ -753,9 +984,9 @@ def list_timetable():
     """.format(','.join('?' for _ in selected_semesters))
     params = list(selected_semesters)
 
-    if selected_department_name:
-        sql += ' AND c.department = ?'
-        params.append(selected_department_name)
+    if selected_department_id:
+        sql += ' AND t.department_id = ?'
+        params.append(selected_department_id)
 
     if search:
         sql += ' AND (te.name LIKE ? OR r.name LIKE ? OR r.name_ar LIKE ? OR c.name LIKE ?)'
@@ -767,10 +998,15 @@ def list_timetable():
     timetable = {}
     for row in rows:
         day_map = timetable.setdefault(row['day'], {})
-        sem_map = day_map.setdefault(row['semester'], {})
-        # Store the first entry for the slot to match template expectations (single object)
-        if row['section'] not in sem_map:
-            sem_map[row['section']] = dict(row)
+        # Normalize semester key to int for template compatibility
+        try:
+            sem_key = int(row['semester'])
+        except Exception:
+            sem_key = row['semester']
+        sem_map = day_map.setdefault(sem_key, {})
+        # ALWAYS use list for slot structure (Clean pattern to prevent duplication)
+        slot = sem_map.setdefault(row['section'], [])
+        slot.append(dict(row))
 
     current_owner_id = current_user_id()
     department_filter = selected_department_name if is_super_admin() else _scoped_department_name(conn)
@@ -815,9 +1051,8 @@ def export_timetable():
     department_semester_map = {d['name']: d['semesters'] for d in all_departments}
 
     if is_super_admin():
+        # Do not default to the first department for super admins; None means "all departments".
         selected_department_id = _selected_department_id()
-        if selected_department_id is None and all_departments:
-            selected_department_id = all_departments[0]['id']
     else:
         selected_department_id = current_department_id()
 
@@ -834,7 +1069,7 @@ def export_timetable():
 
     # Build query with identical search/filter logic
     sql = """
-        SELECT t.*, c.name AS course_name, te.name AS teacher_name, 
+        SELECT t.*, c.name AS course_name, c.department AS course_department, te.name AS teacher_name, 
                r.name AS room_name, r.name_ar AS room_name_ar
         FROM timetable t
         JOIN courses c ON c.id = t.course_id
@@ -844,9 +1079,9 @@ def export_timetable():
     """.format(','.join('?' for _ in selected_semesters))
     params = list(selected_semesters)
 
-    if selected_department_name:
-        sql += ' AND c.department = ?'
-        params.append(selected_department_name)
+    if selected_department_id:
+        sql += ' AND t.department_id = ?'
+        params.append(selected_department_id)
     if search:
         sql += ' AND (te.name LIKE ? OR r.name LIKE ? OR r.name_ar LIKE ? OR c.name LIKE ?)'
         params.extend([f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%'])
@@ -892,11 +1127,8 @@ def export_timetable():
         
         # Comprehensive conflict detection
         semester_overlap = slot_counts.get((r['day'], r['semester'], r['section']), 0) > 1
-        db_conflict_msg = _validate_schedule_conflicts(
-            conn, day=r['day'], semester=r['semester'], period_code=r['section'],
-            teacher_id=r['teacher_id'], room_id=r['room_id'], exclude_entry_id=r['id'],
-            start_time=r['start_time'], end_time=r['end_time']
-        )
+        conflict_entry = check_timetable_conflict(conn, r['course_department'], r['day'], r['semester'], r['section'], exclude_id=r['id'])
+        db_conflict_msg = f"تعارض مع: {conflict_entry['course_name']}" if conflict_entry else None
         is_conflict = semester_overlap or bool(db_conflict_msg)
 
         ws.cell(row=idx, column=1, value=r['day'])
@@ -1030,7 +1262,16 @@ def create_timetable():
     conn = db.get_db()
     enabled_periods = _get_periods(conn, enabled_only=True)
     default_day = request.args.get('day', DAY_NAMES[0])
-    default_semester = _safe_int(request.args.get('semester'), 1)
+    # Determine selected department and its semester count to choose a sensible default semester
+    selected_department_id = _selected_department_id()
+    dept_info = _department_id_map(conn).get(selected_department_id)
+    dept_semesters = 0
+    if dept_info and dept_info.get('semesters') and str(dept_info.get('semesters')).isdigit():
+        try:
+            dept_semesters = int(dept_info.get('semesters'))
+        except Exception:
+            dept_semesters = 0
+    default_semester = _safe_int(request.args.get('semester'), 2 if dept_semesters > 1 else 1)
     default_period_code = request.args.get('section', enabled_periods[0]['code'] if enabled_periods else 'A')
     is_modal = request.values.get('modal') in {'1', 'true', 'True'}
 
@@ -1041,7 +1282,7 @@ def create_timetable():
     default_period_end_time = default_period_details['end_time'] if default_period_details else None
 
     next_url = (request.values.get('next') or '').strip()
-    selected_department_id = _selected_department_id()
+    selected_department_id = selected_department_id or _selected_department_id()
     selected_department_name = _selected_department_name(conn)
 
     if request.method == 'POST':
@@ -1061,7 +1302,7 @@ def create_timetable():
     department_filter = selected_department_name if is_super_admin() else _scoped_department_name(conn)
 
     return render_template(
-        'timetable/create.html',
+        'timetable/form.html',
         days=DAY_NAMES,
         enabled_periods=enabled_periods,
         courses=_fetch_courses(conn, include_all=is_super_admin(), owner_user_id=current_user_id(), department_name=department_filter),
@@ -1104,6 +1345,11 @@ def edit_timetable(id):
             form_start_time = period_details['start_time']
             form_end_time = period_details['end_time']
     next_url = (request.values.get('next') or '').strip()
+
+    # determine selected department context early (used by POST redirects and availability lookups)
+    selected_department_id = _selected_department_id() or entry.get('department_id')
+    selected_department_name = _selected_department_name(conn, fallback=entry.get('course_department'))
+
     if request.method == 'POST':
         result, error = _process_timetable_save(conn, id, request.form)
         if error:
@@ -1120,8 +1366,6 @@ def edit_timetable(id):
     available_rooms = _room_availability_rows(conn, entry['day'], entry['semester'], entry['section'], exclude_entry_id=id)
     available_teachers = _available_teachers(conn, entry['day'], entry['semester'], entry['section'], current_user_id(), exclude_entry_id=id, department_name=selected_department_name)
     available_teachers = _ensure_selection(available_teachers, entry['teacher_id'], conn, 'teachers')
-    selected_department_id = _selected_department_id() or entry.get('department_id')
-    selected_department_name = _selected_department_name(conn, fallback=entry.get('course_department'))
 
     department_filter = selected_department_name if is_super_admin() else _scoped_department_name(conn)
 
@@ -1183,17 +1427,31 @@ def edit_entry():
 @login_required
 @courses_timetable_admin_required
 def delete_entry():
-    if not _can_delete_critical():
-        return jsonify({'ok': False, 'message': 'Only the super admin can delete timetable entries.'}), 403
-
     payload = request.get_json(silent=True) or {}
     entry_id = _safe_int(payload.get('lecture_id'))
     conn = db.get_db()
-    entry = conn.execute('SELECT * FROM timetable WHERE id = ?', (entry_id,)).fetchone()
+    # fetch full entry with relations for reliable department info
+    entry = _entry_with_relations(conn, entry_id)
+    if not entry:
+        return jsonify({'ok': False, 'message': 'الحصة غير موجودة.'}), 404
+
+    # Permission: allow super_admin, or allow admin to delete entries within their department
+    entry_dept_id = entry.get('department_id')
+    if not entry_dept_id:
+        # try to resolve from course department name
+        course_dept = (entry.get('course_department') or '').strip()
+        if course_dept:
+            dept_row = conn.execute('SELECT id FROM departments WHERE LOWER(TRIM(name)) = LOWER(TRIM(?)) LIMIT 1', (course_dept,)).fetchone()
+            if dept_row:
+                entry_dept_id = dept_row['id']
+
+    if not (is_super_admin() or (current_role() == 'admin' and entry_dept_id == current_department_id())):
+        return jsonify({'ok': False, 'message': 'فقط المشرف العام أو أدمن القسم يمكنه حذف الحصص داخل قسمه.'}), 403
+
     if not _can_access_entry(conn, entry):
         return jsonify({'ok': False, 'message': 'Not allowed.'}), 403
 
-    old_entry = _entry_with_relations(conn, entry_id)
+    old_entry = entry
     db.add_history(
         conn,
         'DELETE',

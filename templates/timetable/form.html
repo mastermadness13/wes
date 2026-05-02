@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card-section {% if is_modal %}timetable-modal-sheet{% endif %}">
+  <style>
+    .searchable-wrapper { position: relative; }
+    .searchable-list { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 12000; max-height: 240px; overflow: auto; background: #fff; border: 1px solid #e2e2e2; border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+    .searchable-item { padding: .5rem .75rem; cursor: pointer; border-bottom: 1px solid #f3f3f3; }
+    .searchable-item:hover, .searchable-item-active { background: #f2f8ff; }
+    .searchable-list .searchable-item[aria-disabled="true"] { opacity: .6; cursor: not-allowed; }
+  </style>
+  <div class="page-title mb-3">
+    <div class="page-summary">
+      <h2>{{ 'تعديل الحصة' if entry else 'إضافة حصة جديدة' }}</h2>
+      <p>تأكد من اختيار المادة والقاعة والمدرس بشكل صحيح لتجنب التعارض.</p>
+      {% if selected_department_name %}
+        <p class="mb-0 text-muted">القسم: {{ selected_department_name }}</p>
+      {% endif %}
+    </div>
+    {% if is_modal %}
+      <button type="button" class="btn btn-outline-secondary" id="closeModalBtn">إغلاق</button>
+    {% else %}
+      <a href="{{ next_url or url_for('timetable.list_timetable') }}" class="btn btn-outline-secondary">العودة للجدول</a>
+    {% endif %}
+  </div>
+
+  <form method="post" id="timetable-form">
+    <input type="hidden" name="next" value="{{ next_url or '' }}">
+    <input type="hidden" name="modal" value="{{ 1 if is_modal else 0 }}">
+    <input type="hidden" name="department_id" value="{{ selected_department_id or '' }}">
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="day">اليوم</label>
+        <select class="form-control" name="day" id="day" required>
+          {% for day in days %}
+            <option value="{{ day }}" {% if day == default_day %}selected{% endif %}>{{ day }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="semester">الفصل الدراسي</label>
+        <select class="form-control" name="semester" id="semester" required>
+          {% for sem in range(1, 8) %}
+            <option value="{{ sem }}" {% if sem == default_semester %}selected{% endif %}>الفصل {{ sem }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="period">الفترة</label>
+        <select class="form-control" name="section" id="period" required>
+          {% for period in enabled_periods %}
+            <option value="{{ period.code }}" 
+                    data-start="{{ period.start_time }}" 
+                    data-end="{{ period.end_time }}" 
+                    {% if period.code == default_period_code %}selected{% endif %}>
+              {{ period.label }} ({{ period.start_time }} ← {{ period.end_time }})
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group searchable-wrapper">
+        <label for="course_input">المقرر</label>
+        <input type="text" class="form-control searchable-input" id="course_input" placeholder="ابحث أو اكتب لاختيار المقرر">
+        <input type="hidden" name="course_id" id="course_id" value="{{ entry.course_id if entry else '' }}">
+        <div class="searchable-list" id="course_list" style="display:none;"></div>
+        <div class="invalid-feedback" id="course_error" style="display:none">القيمة غير موجودة</div>
+      </div>
+
+      <div class="form-group searchable-wrapper">
+        <label for="teacher_input">المدرس</label>
+        <input type="text" class="form-control searchable-input" id="teacher_input" placeholder="ابحث أو اكتب لاختيار المدرس">
+        <input type="hidden" name="teacher_id" id="teacher_id" value="{{ entry.teacher_id if entry else '' }}">
+        <div class="searchable-list" id="teacher_list" style="display:none;"></div>
+        <div class="invalid-feedback" id="teacher_error" style="display:none">القيمة غير موجودة</div>
+      </div>
+
+      <div class="form-group full searchable-wrapper">
+        <label for="room_input">القاعة</label>
+        <input type="text" class="form-control searchable-input" id="room_input" placeholder="ابحث أو اكتب لاختيار القاعة">
+        <input type="hidden" name="room_id" id="room_id" value="{{ entry.room_id if entry else '' }}">
+        <div class="searchable-list" id="room_list" style="display:none;"></div>
+        <div class="invalid-feedback" id="room_error" style="display:none">القيمة غير موجودة</div>
+      </div>
+
+      <div class="form-group">
+        <label for="start_time">وقت البداية</label>
+        <input type="time" class="form-control" name="start_time" id="start_time" value="{{ form_start_time or '' }}">
+      </div>
+
+      <div class="form-group">
+        <label for="end_time">وقت النهاية</label>
+        <input type="time" class="form-control" name="end_time" id="end_time" value="{{ form_end_time or '' }}">
+      </div>
+    </div>
+
+    <div class="form-actions mt-3">
+      <label class="form-check" style="margin-inline-end:0.5rem; display:inline-flex; align-items:center; gap:0.5rem;">
+        <input type="checkbox" name="force_save" id="force_save">
+        <span style="font-size:0.95rem;">تجاهل التعارضات وحفظ (تأكد من أنك تريد ذلك)</span>
+      </label>
+      <button class="btn btn-primary" type="submit" id="submitBtn">
+        {{ 'حفظ التعديلات' if entry else 'حفظ الحصة' }}
+      </button>
+      {% if entry %}
+      <button class="btn btn-danger ml-2" type="button" id="deleteBtn">حذف الحصة</button>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<script>
+  window.APP_DATA = window.APP_DATA || {};
+  window.APP_DATA.entryId = '{{ entry.id if entry else "" }}';
+  window.APP_DATA.originalRoomId = '{{ entry.room_id if entry else "" }}';
+  window.APP_DATA.originalTeacherId = '{{ entry.teacher_id if entry else "" }}';
+  // Provide datasets for searchable dropdowns
+  window.APP_DATA.courses = {{ courses|tojson | safe }};
+  window.APP_DATA.teachers = {{ teachers|tojson | safe }};
+  window.APP_DATA.rooms = {{ initial_rooms|tojson | safe }};
+</script>
+<script src="{{ url_for('static', filename='js/timetable.js') }}"></script>
+{% if entry %}
+<script>
+  (function(){
+    const deleteBtn = document.getElementById('deleteBtn');
+    if (!deleteBtn) return;
+    deleteBtn.addEventListener('click', async function(){
+      if (!confirm('هل أنت متأكد من حذف هذه الحصة؟')) return;
+      try {
+        const res = await fetch('{{ url_for('timetable.delete_entry') }}', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lecture_id: {{ entry.id }} })
+        });
+        const data = await res.json().catch(()=>({ok:false, message:'فشل في قراءة استجابة السيرفر'}));
+        if (data.ok) {
+          // If inside modal, notify parent to refresh and close
+          try {
+            if (window.parent && window.parent !== window) {
+              window.parent.postMessage({ type: 'timetable-modal-saved' }, '*');
+            } else {
+              // fallback: redirect to list
+              window.location.href = '{{ url_for('timetable.list_timetable') }}';
+            }
+          } catch (e) {
+            window.location.href = '{{ url_for('timetable.list_timetable') }}';
+          }
+        } else {
+          showNotificationModal(data.message || 'فشل الحذف');
+        }
+      } catch (err) {
+        showNotificationModal('خطأ في الاتصال بالسيرفر');
+      }
+    });
+  })();
+</script>
+{% endif %}
+{% endblock %}

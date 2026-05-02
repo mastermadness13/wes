@@ -2,7 +2,7 @@ from io import BytesIO
 import re
 
 try:
-    import pandas as pd
+    import pandas as pd  # type: ignore
 except ImportError:
     pd = None
 
@@ -21,7 +21,8 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font
 
 import db
-from routes import super_admin_required, login_required
+from routes import courses_timetable_admin_required, current_department_name, current_role, current_user_id, login_required
+from routes.access import admin_department_required, department_name_allowed, is_super_admin
 
 courses_bp = Blueprint('courses', __name__)
 
@@ -42,6 +43,10 @@ CATEGORY_HINTS = {
 
 def _get_departments(conn):
     return conn.execute('SELECT name FROM departments ORDER BY name').fetchall()
+
+
+def _get_department_map(departments):
+    return {row['name'].lower(): row['name'] for row in departments}
 
 
 def _history_actor():
@@ -68,13 +73,20 @@ def _valid_department_names(departments):
     return {row['name'] for row in departments}
 
 
+def _normalize_arabic_text(text):
+    if text is None:
+        return ""
+    # Standardize 'هـ' and 'ه' + tatweel to 'ه'
+    return str(text).replace('\u0647\u0640', '\u0647').replace('هـ', 'ه').strip()
+
+
 def _normalize_course_code(code):
-    value = (code or '').strip()
-    return value.replace('هـ', 'ه')
+    # Unify Arabic characters and remove all internal spaces for codes
+    return _normalize_arabic_text(code).replace(' ', '')
 
 
 def _normalize_notes(notes):
-    value = (notes or '').strip()
+    value = _normalize_arabic_text(notes)
     return value or None
 
 
@@ -102,14 +114,15 @@ def _contains_corrupted_text(value):
 def _sanitize_excel_text(value):
     if value is None:
         return ''
-    text = str(value).strip()
-    if _contains_corrupted_text(text):
+    sanitized = str(value).strip()
+    if _contains_corrupted_text(sanitized):
         return None
-    return re.sub(r'\s+', ' ', text)
+    # Normalize Arabic characters and collapse multiple spaces
+    return re.sub(r'\s+', ' ', _normalize_arabic_text(sanitized))
 
 
 def _infer_category_letter(department_name):
-    normalized = (department_name or '').strip().lower()
+    normalized = _normalize_arabic_text(department_name).lower()
     if normalized in {'قسم النفط', 'قسم المدني', 'قسم المعماري'}:
         return 'ه'
     if normalized in {'قسم الحاسوب', 'قسم الاتصالات'}:
@@ -125,17 +138,25 @@ def _infer_category_letter(department_name):
 def _build_generated_code(conn, department, year, exclude_course_id=None):
     letter = _infer_category_letter(department)
     prefix = f'{letter}{year}'
-    sql = 'SELECT code FROM courses WHERE code LIKE ?'
-    params = [f'{prefix}%']
+    
+    # جلب كافة الرموز لمعالجتها في بايثون لضمان دقة التحقق من الحروف العربية
+    sql = 'SELECT code FROM courses'
+    params = []
     if exclude_course_id is not None:
-        sql += ' AND id != ?'
+        sql += ' WHERE id != ?'
         params.append(exclude_course_id)
 
     max_sequence = 0
-    for row in conn.execute(sql, params).fetchall():
-        code = _normalize_course_code(row['code'])
-        if COURSE_CODE_PATTERN.match(code) and code.startswith(prefix):
-            max_sequence = max(max_sequence, int(code[-2:]))
+    rows = conn.execute(sql, params).fetchall()
+    for row in rows:
+        norm_code = _normalize_course_code(row['code'])
+        if COURSE_CODE_PATTERN.match(norm_code) and norm_code.startswith(prefix):
+            try:
+                # استخراج الجزء الرقمي الأخير (مثل 01 من ه101)
+                seq_part = norm_code[-2:]
+                max_sequence = max(max_sequence, int(seq_part))
+            except (ValueError, IndexError):
+                continue
 
     next_sequence = max_sequence + 1
     if next_sequence > 99:
@@ -143,9 +164,9 @@ def _build_generated_code(conn, department, year, exclude_course_id=None):
     return f'{prefix}{next_sequence:02d}'
 
 
-def _code_exists(conn, code, owner_user_id, exclude_course_id=None):
-    sql = 'SELECT id FROM courses WHERE user_id = ? AND code = ?'
-    params = [owner_user_id, code]
+def _code_exists(conn, code, department, exclude_course_id=None):
+    sql = 'SELECT id FROM courses WHERE department = ? AND code = ?'
+    params = [department, code]
     if exclude_course_id is not None:
         sql += ' AND id != ?'
         params.append(exclude_course_id)
@@ -154,23 +175,26 @@ def _code_exists(conn, code, owner_user_id, exclude_course_id=None):
 
 def _get_course_form_data():
     return {
-        'name': (request.form.get('name') or '').strip(),
+        'name': _normalize_arabic_text(request.form.get('name')),
         'code': _normalize_course_code(request.form.get('code')),
-        'department': (request.form.get('department') or '').strip(),
-        'year': request.form.get('year', '').strip(),
-        'notes': (request.form.get('notes') or '').strip(),
+        'department': _normalize_arabic_text(request.form.get('department')),
+        'year': (request.form.get('year') or '').strip(),
+        'notes': _normalize_arabic_text(request.form.get('notes')),
     }
 
 
 def _validate_course_form(conn, form_data, departments, owner_user_id, exclude_course_id=None):
     errors = []
-    valid_departments = _valid_department_names(departments)
+    dept_map = _get_department_map(departments)
 
     if not form_data['name']:
         errors.append('اسم المادة مطلوب.')
 
-    if form_data['department'] not in valid_departments:
+    dept_input = form_data['department'].lower() if form_data['department'] else ""
+    if dept_input not in dept_map:
         errors.append('يرجى اختيار قسم صحيح من القائمة.')
+    else:
+        form_data['department'] = dept_map[dept_input]
 
     year = _parse_year(form_data['year'])
     if year is None:
@@ -183,7 +207,7 @@ def _validate_course_form(conn, form_data, departments, owner_user_id, exclude_c
         errors.append('الرمز يجب أن يبدأ بحرف القسم (هـ، ت، أو ع) متبوعاً بثلاثة أرقام مثل ه101 أو ت205.')
     elif year is not None and code[1] != str(year):
         errors.append('الرقم الأول بعد حرف القسم يجب أن يطابق السنة الدراسية المختارة.')
-    elif _code_exists(conn, code, owner_user_id, exclude_course_id=exclude_course_id):
+    elif _code_exists(conn, code, form_data['department'], exclude_course_id=exclude_course_id):
         errors.append('رمز المادة مستخدم بالفعل لمادة أخرى.')
 
     return errors, year, _normalize_notes(form_data['notes'])
@@ -269,8 +293,9 @@ def _read_excel_rows(file_storage):
 
 def _validate_import_rows(conn, departments, rows):
     errors = []
-    valid_departments = _valid_department_names(departments)
+    dept_map = _get_department_map(departments)
     seen_codes = set()
+    seen_names = set()  # (department, name_lower)
     sanitized_rows = []
 
     for row in rows:
@@ -292,8 +317,13 @@ def _validate_import_rows(conn, departments, rows):
         year = _parse_year(row['year'])
         if not corrupted and not row['name']:
             errors.append(f"الصف {row['row_number']}: اسم المادة مطلوب.")
-        if not corrupted and row['department'] not in valid_departments:
+
+        dept_input = row['department'].lower() if row['department'] else ""
+        if not corrupted and dept_input not in dept_map:
             errors.append(f"الصف {row['row_number']}: القسم غير موجود.")
+        elif not corrupted:
+            row['department'] = dept_map[dept_input]
+
         if not corrupted and year is None:
             errors.append(f"الصف {row['row_number']}: السنة الدراسية يجب أن تكون بين 1 و4.")
         if not corrupted and not code:
@@ -303,9 +333,27 @@ def _validate_import_rows(conn, departments, rows):
         elif not corrupted and year is not None and code[1] != str(year):
             errors.append(f"الصف {row['row_number']}: الرقم الأول بعد حرف القسم يجب أن يطابق السنة الدراسية المحددة.")
 
-        if not corrupted and code in seen_codes:
-            errors.append(f"الصف {row['row_number']}: يوجد تكرار داخل الملف لنفس رمز المادة.")
+        name_lower = row['name'].lower() if row['name'] else ""
+        dept_name_key = (row['department'], name_lower)
+
+        if not corrupted:
+            if code in seen_codes:
+                errors.append(f"الصف {row['row_number']}: يوجد تكرار داخل الملف لنفس رمز المادة.")
+            
+            if row['name'] and dept_name_key in seen_names:
+                errors.append(f"الصف {row['row_number']}: اسم المادة '{row['name']}' مكرر داخل الملف لنفس القسم.")
+            
+            if row['name'] and row['department'] and code:
+                # Verify if this name exists in the DB for this department under a different code
+                existing_name = conn.execute(
+                    'SELECT code FROM courses WHERE department = ? AND LOWER(name) = ? AND code != ?',
+                    (row['department'], name_lower, code)
+                ).fetchone()
+                if existing_name:
+                    errors.append(f"الصف {row['row_number']}: المادة '{row['name']}' مسجلة مسبقاً في قسم {row['department']} برمز مختلف ({existing_name['code']}).")
+
         seen_codes.add(code)
+        seen_names.add(dept_name_key)
 
         sanitized_rows.append(
             {
@@ -323,8 +371,8 @@ def _validate_import_rows(conn, departments, rows):
 
 def _upsert_course(conn, course_data):
     existing = conn.execute(
-        'SELECT * FROM courses WHERE user_id = ? AND code = ?',
-        (session['user_id'], course_data['code']),
+        'SELECT * FROM courses WHERE department = ? AND code = ?',
+        (course_data['department'], course_data['code']),
     ).fetchone()
 
     if existing:
@@ -361,7 +409,7 @@ def _upsert_course(conn, course_data):
         VALUES (?, ?, ?, ?, ?, ?)
         ''',
         (
-            session['user_id'],
+            current_user_id(),
             course_data['name'],
             course_data['code'],
             course_data['department'],
@@ -382,17 +430,19 @@ def _upsert_course(conn, course_data):
     return 'inserted'
 
 
+
 @courses_bp.route('/')
 @login_required
-@super_admin_required
+@admin_department_required
 def list_courses():
     conn = db.get_db()
-    department = (request.args.get('department') or '').strip()
+    requested_department = (request.args.get('department') or '').strip()
+    department = requested_department if is_super_admin() else (current_department_name(conn) or '')
     search = (request.args.get('q') or '').strip()
     selected_year = _parse_year(request.args.get('year'))
-    departments = _get_departments(conn)
+    departments = _get_departments(conn) if is_super_admin() else [{'name': current_department_name(conn)}]
 
-    if session.get('role') == 'super_admin':
+    if is_super_admin():
         sql = '''
         SELECT c.*, u.label AS owner_label
         FROM courses c
@@ -412,6 +462,7 @@ def list_courses():
         sql += ' ORDER BY c.year, c.code, c.name'
         courses = conn.execute(sql, params).fetchall()
     else:
+        # الأدمن يرى فقط دورات قسمه
         sql = '''
         SELECT
             c.*,
@@ -420,12 +471,9 @@ def list_courses():
         FROM courses c
         LEFT JOIN timetable t ON c.id = t.course_id AND t.user_id = c.user_id
         LEFT JOIN teachers te ON t.teacher_id = te.id
-        WHERE c.user_id = ?
+        WHERE c.department = ?
         '''
-        params = [session['user_id']]
-        if department:
-            sql += ' AND c.department = ?'
-            params.append(department)
+        params = [current_department_name(conn)]
         if selected_year is not None:
             sql += ' AND c.year = ?'
             params.append(selected_year)
@@ -447,15 +495,17 @@ def list_courses():
 
 @courses_bp.route('/create', methods=['GET', 'POST'])
 @login_required
-@super_admin_required
+@courses_timetable_admin_required
 def create_course():
     conn = db.get_db()
-    departments = _get_departments(conn)
+    departments = _get_departments(conn) if is_super_admin() else [{'name': current_department_name(conn)}]
     form_data = {'name': '', 'code': '', 'department': '', 'year': '1', 'notes': ''}
 
     if request.method == 'POST':
         form_data = _get_course_form_data()
-        errors, year, notes = _validate_course_form(conn, form_data, departments, owner_user_id=session['user_id'])
+        if not is_super_admin():
+            form_data['department'] = current_department_name(conn) or ''
+        errors, year, notes = _validate_course_form(conn, form_data, departments, owner_user_id=current_user_id())
 
         for error in errors:
             flash(error, 'danger')
@@ -467,7 +517,7 @@ def create_course():
                 VALUES (?, ?, ?, ?, ?, ?)
                 ''',
                 (
-                    session['user_id'],
+                    current_user_id(),
                     form_data['name'],
                     form_data['code'],
                     form_data['department'],
@@ -486,7 +536,7 @@ def create_course():
                 new_value=dict(inserted) if inserted else {'name': form_data['name'], 'code': form_data['code'], 'department': form_data['department'], 'year': year},
             )
             conn.commit()
-            flash('??? ????? ?????? ?????.', 'success')
+            flash('تم إضافة المقرر بنجاح.', 'success')
             return _safe_redirect_to_courses()
 
     return render_template('courses/create.html', departments=departments, form_data=form_data)
@@ -494,10 +544,10 @@ def create_course():
 
 @courses_bp.route('/upload', methods=['POST'])
 @login_required
-@super_admin_required
+@courses_timetable_admin_required
 def upload_courses_excel():
     conn = db.get_db()
-    departments = _get_departments(conn)
+    departments = _get_departments(conn) if is_super_admin() else [{'name': current_department_name(conn)}]
     upload = request.files.get('excel_file')
 
     if not upload or not upload.filename:
@@ -514,6 +564,10 @@ def upload_courses_excel():
         flash('تعذر قراءة ملف Excel. تأكد من أن الملف بصيغة .xlsx وصالح للقراءة.', 'danger')
         return _safe_redirect_to_courses()
     sanitized_rows, validation_errors = _validate_import_rows(conn, departments, rows)
+    if not is_super_admin():
+        current_department = current_department_name(conn) or ''
+        for row in sanitized_rows:
+            row['department'] = current_department
     errors = file_errors + validation_errors
 
     if errors:
@@ -539,10 +593,10 @@ def upload_courses_excel():
 
 @courses_bp.route('/download')
 @login_required
-@super_admin_required
+@courses_timetable_admin_required
 def download_courses_excel():
     conn = db.get_db()
-    if session.get('role') == 'super_admin':
+    if is_super_admin():
         courses = conn.execute(
             '''
             SELECT code, name, department, year, notes
@@ -555,10 +609,10 @@ def download_courses_excel():
             '''
             SELECT code, name, department, year, notes
             FROM courses
-            WHERE user_id = ?
+            WHERE department = ?
             ORDER BY department, year, code
             ''',
-            (session['user_id'],),
+            (current_department_name(conn),),
         ).fetchall()
 
     workbook = Workbook()
@@ -599,10 +653,12 @@ def download_courses_excel():
 
 @courses_bp.route('/generate-code')
 @login_required
-@super_admin_required
+@courses_timetable_admin_required
 def generate_course_code():
     conn = db.get_db()
     department = request.args.get('department', '').strip()
+    if not is_super_admin():
+        department = current_department_name(conn) or ''
     year = _parse_year(request.args.get('year'))
     course_id = request.args.get('course_id', type=int)
 
@@ -614,20 +670,25 @@ def generate_course_code():
 
 @courses_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
-@super_admin_required
+@courses_timetable_admin_required
 def edit_course(id):
     conn = db.get_db()
     course = conn.execute('SELECT * FROM courses WHERE id = ?', (id,)).fetchone()
-    departments = _get_departments(conn)
+    departments = _get_departments(conn) if is_super_admin() else [{'name': current_department_name(conn)}]
 
-    if not course or (course['user_id'] != session['user_id'] and session['role'] != 'super_admin'):
-        flash('??? ?????.', 'danger')
+    if not course:
+        flash('المقرر غير موجود.', 'danger')
+        return redirect(url_for('courses.list_courses'))
+    if not is_super_admin() and not department_name_allowed(conn, course['department']):
+        flash('ليس لديك صلاحية الوصول.', 'danger')
         return redirect(url_for('courses.list_courses'))
 
     form_data = _course_payload_from_row(course)
 
     if request.method == 'POST':
         form_data = _get_course_form_data()
+        if not is_super_admin():
+            form_data['department'] = current_department_name(conn) or ''
         errors, year, notes = _validate_course_form(
             conn,
             form_data,
@@ -667,7 +728,7 @@ def edit_course(id):
                 new_value=dict(updated) if updated else None,
             )
             conn.commit()
-            flash('?? ????? ?????? ?????.', 'success')
+            flash('تم تحديث المقرر بنجاح.', 'success')
             return _safe_redirect_to_courses()
 
     return render_template(
@@ -680,16 +741,15 @@ def edit_course(id):
 
 @courses_bp.route('/<int:id>/delete', methods=['POST'])
 @login_required
-@super_admin_required
+@courses_timetable_admin_required
 def delete_course(id):
-    if session.get('role') != 'super_admin':
-        flash('??? ???? ?????? ??? ??? ??????.', 'danger')
-        return _safe_redirect_to_courses()
-
     conn = db.get_db()
     course = conn.execute('SELECT * FROM courses WHERE id = ?', (id,)).fetchone()
     if not course:
-        flash('?????? ??? ??????.', 'danger')
+        flash('المقرر غير موجود.', 'danger')
+        return _safe_redirect_to_courses()
+    if not is_super_admin() and not department_name_allowed(conn, course['department']):
+        flash('ليس لديك صلاحية حذف مقرر من قسم آخر.', 'danger')
         return _safe_redirect_to_courses()
 
     db.add_history(
@@ -703,5 +763,5 @@ def delete_course(id):
     )
     conn.execute('DELETE FROM courses WHERE id = ?', (id,))
     conn.commit()
-    flash('?? ??? ?????? ?????.', 'success')
+    flash('تم حذف المقرر بنجاح.', 'success')
     return _safe_redirect_to_courses()

@@ -1,212 +1,199 @@
-﻿{% extends 'base.html' %}
+﻿﻿{% extends 'base.html' %}
 {% block content %}
+
 <div class="timetable-layout">
-  <section class="page-card timetable-hero no-print">
-    <div class="page-title">
-      <div class="page-summary">
-        <h2>جدول المقررات</h2>
-        <p>اعرض الجدول حسب القسم والفصل الدراسي، ثم اطبع العرض النظيف مباشرة.</p>
-      </div>
-      <div class="timetable-actions">
-        <a href="{{ url_for('timetable.create_timetable', next=request.full_path.rstrip('?')) }}" class="btn btn-success">إضافة حصة</a>
-        <button type="button" class="btn btn-outline-primary" onclick="window.print()">طباعة الجدول</button>
-      </div>
-    </div>
-  </section>
-
-  <section class="page-card timetable-filter-card no-print">
-    <form method="get" class="timetable-filters">
-      <div class="form-group mb-0">
-        <label for="departmentFilter">القسم</label>
-        <select id="departmentFilter" name="department_id" class="form-control">
-          <option value="">كل الأقسام</option>
-          {% for dept in departments %}
-          <option value="{{ dept.id }}" {% if dept.id|string == selected_department_id %}selected{% endif %}>{{ dept.name }}</option>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <section class="page-card no-print">
+        <div class="alert-area">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
           {% endfor %}
-        </select>
-      </div>
-
-      {% if session.role == 'super_admin' %}
-      <div class="form-group mb-0">
-        <label for="userFilter">المستخدم</label>
-        <select id="userFilter" name="user_id" class="form-control">
-          <option value="">كل المستخدمين</option>
-          {% for user in users %}
-          <option value="{{ user.id }}" {% if user.id|string == selected_user_id %}selected{% endif %}>{{ user.username }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      {% endif %}
-
-      <div class="form-group mb-0 full">
-        <label>الفصول الدراسية</label>
-        <div class="badge-stack">
-          {% for semester in allowed_semesters %}
-          <label class="badge-soft mb-0">
-            <input type="checkbox" name="semester" value="{{ semester }}" {% if semester in selected_semesters %}checked{% endif %}>
-            <span>الفصل {{ semester }}</span>
-          </label>
-          {% endfor %}
-        </div>
-      </div>
-
-      <div class="form-group mb-0 d-flex align-items-end">
-        <button type="submit" class="btn btn-primary">تطبيق</button>
-      </div>
-      <div class="form-group mb-0 d-flex align-items-end">
-        <a href="{{ url_for('timetable.list_timetable') }}" class="btn btn-outline-secondary">إعادة الضبط</a>
-      </div>
-    </form>
-  </section>
-
-  {% if session.role == 'super_admin' %}
-  <section class="page-card no-print">
-    <button class="btn btn-link p-0 mb-3" data-toggle="periodSettings">تعديل إعدادات الفترات</button>
-    <div id="periodSettings" class="collapsible">
-      <form method="post" action="{{ url_for('timetable.update_period_settings') }}">
-        <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
-        <div class="timetable-period-grid">
-          {% for period in period_settings %}
-          <div class="period-card">
-            <div class="form-group">
-              <label>اسم الفترة</label>
-              <input class="form-control" name="{{ period.code }}_label" value="{{ period.label }}" required>
-            </div>
-            <div class="form-row">
-              <div class="form-group col-6">
-                <label>البداية</label>
-                <input class="form-control" type="time" name="{{ period.code }}_start" value="{{ period.start_time }}" required>
-              </div>
-              <div class="form-group col-6">
-                <label>النهاية</label>
-                <input class="form-control" type="time" name="{{ period.code }}_end" value="{{ period.end_time }}" required>
-              </div>
-            </div>
-            <div class="custom-control custom-switch">
-              <input class="custom-control-input" type="checkbox" id="period_{{ period.code }}" name="{{ period.code }}_enabled" value="1" {% if period.is_enabled %}checked{% endif %}>
-              <label class="custom-control-label" for="period_{{ period.code }}">تفعيل الفترة</label>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-        <div class="mt-3">
-          <button class="btn btn-primary" type="submit">حفظ الإعدادات</button>
-        </div>
-      </form>
-    </div>
-  </section>
-  {% endif %}
-
-
-  <section class="page-card timetable-card print-area">
-    <!-- Header inside timetable card (always visible, also in print) -->
-    <div class="timetable-main-header print-area" style="text-align:center; margin-bottom: 1.5rem;">
-      <style>
-      @media print {
-        .timetable-main-header {
-          margin-bottom: 2.5cm !important;
-          page-break-inside: avoid;
-        }
-      }
-      </style>
-      <h2 style="margin-bottom:0.25em">{{ selected_department_name or 'جميع الأقسام' }}</h2>
-      <div style="font-size:1.2em; font-weight:500; margin-bottom:0.5em">
-        {% if selected_semesters|length == 1 %}
-          الفصل {{ selected_semesters[0] }}
-        {% else %}
-          {% for semester in selected_semesters %}الفصل {{ semester }}{% if not loop.last %}، {% endif %}{% endfor %}
-        {% endif %}
-      </div>
-      {% if session.role == 'super_admin' %}
-      <form method="get" style="display:inline-flex; gap:0.5em; align-items:center; margin-bottom:0.5em; flex-wrap:wrap;">
-        {% if selected_user_id %}
-        <input type="hidden" name="user_id" value="{{ selected_user_id }}">
-        {% endif %}
-        <select name="department_id" class="form-control" style="width:auto; display:inline-block;">
-          <option value="">كل الأقسام</option>
-          {% for dept in departments %}
-          <option value="{{ dept.id }}" {% if dept.id|string == selected_department_id %}selected{% endif %}>{{ dept.name }}</option>
-          {% endfor %}
-        </select>
-        <select name="semester" class="form-control" style="width:auto; display:inline-block;">
-          {% for semester in allowed_semesters %}
-          <option value="{{ semester }}" {% if selected_semesters and semester == selected_semesters[0] %}selected{% endif %}>الفصل {{ semester }}</option>
-          {% endfor %}
-        </select>
-        <button type="submit" class="btn btn-primary">عرض</button>
-      </form>
-      {% endif %}
-    </div>
-
-    <div class="semester-stack">
-      {% for semester in selected_semesters %}
-      <section class="timetable-subsection" data-semester="{{ semester }}">
-        <div class="table-head mb-3 no-print">
-          <div>
-            <h3 class="mb-1">الفصل {{ semester }}</h3>
-            <p class="mb-0">عرض يومي مرتب مع أزرار تعديل سريعة.</p>
-          </div>
-        </div>
-
-        <div class="timetable-table-wrap">
-          <table class="table table-bordered timetable-print-table">
-            <colgroup>
-              <col class="day-col">
-              {% for period in enabled_periods %}
-              <col>
-              {% endfor %}
-            </colgroup>
-            <thead>
-              <tr>
-                <th>اليوم</th>
-                {% for period in enabled_periods %}
-                <th data-period-code="{{ period.code }}">
-                  <div>{{ period.label }}</div>
-                  <small class="metadata-only text-muted">{{ period.start_time }} - {{ period.end_time }}</small>
-                </th>
-                {% endfor %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for day in days %}
-              <tr>
-                <td><div class="day-label">{{ day_labels.get(day, day) }}</div></td>
-                {% for period in enabled_periods %}
-                {% set entry = timetable.get(day, {}).get(semester, {}).get(period.code) %}
-                <td>
-                  {% if entry %}
-                  <div class="schedule-item" data-edit-url="{{ url_for('timetable.edit_timetable', id=entry.id) }}">
-                    <div class="schedule-course">{{ entry.course_name }}</div>
-                    <div class="schedule-teacher">{{ entry.teacher_name }}</div>
-                    <div class="schedule-room">{{ entry.room_name_ar or entry.room_name }}</div>
-                    {% if session.role == 'super_admin' %}
-                    {% endif %}
-                    <div class="schedule-actions no-print">
-                      <a href="{{ url_for('timetable.edit_timetable', id=entry.id, next=request.full_path.rstrip('?')) }}" class="btn btn-sm btn-outline-primary">تعديل</a>
-                      {% if can_delete_critical %}
-                      <button class="btn btn-sm btn-outline-danger delete-entry-btn" type="button" data-id="{{ entry.id }}">حذف</button>
-                      {% endif %}
-                    </div>
-                  </div>
-                  {% else %}
-                  <div class="empty-cell no-print">إضافة</div>
-                  <div class="d-none d-print-block">—</div>
-                  {% endif %}
-                </td>
-                {% endfor %}
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
         </div>
       </section>
-      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <section class="page-card timetable-card print-area">
+    <div class="timetable-shell">
+      <!-- Toolbar علوي موحد -->
+      <div class="timetable-toolbar no-print">
+        <div class="toolbar-group">
+          <button type="button" class="btn btn-success" data-create-url="{{ url_for('timetable.timetable_form', next=request.full_path.rstrip('?'), department_id=selected_department_id, modal=1) }}">➕ إضافة حصة</button>
+          <button type="button" class="btn btn-outline-primary" data-print-table>🖨 طباعة الجدول</button>
+        </div>
+        <div class="toolbar-group">
+          <form method="get" class="toolbar-inline-form semester-filter-form">
+            {% if session.role == 'super_admin' and all_departments|length > 1 %}
+              <label for="timetableDepartmentSelect">القسم:</label>
+              <select id="timetableDepartmentSelect" class="form-control d-inline-block" name="department_id" data-autosubmit>
+                <option value="" {% if not selected_department_id %}selected{% endif %}>كل الأقسام</option>
+                {% for dept in all_departments %}
+                  <option value="{{ dept.id }}" {% if dept.id == selected_department_id %}selected{% endif %}>{{ dept.name }}</option>
+                {% endfor %}
+              </select>
+            {% elif selected_department_id %}
+              <input type="hidden" name="department_id" value="{{ selected_department_id }}">
+              <span class="toolbar-label">القسم: {{ selected_department_name }}</span>
+            {% endif %}
+            <div class="badge-stack semester-badge-stack">
+              {% for semester in allowed_semesters %}
+                <label class="badge-soft semester-pill {% if semester in selected_semesters %}is-active{% endif %}">
+                  <input type="checkbox" name="semester" value="{{ semester }}" {% if semester in selected_semesters %}checked{% endif %} data-autosubmit>
+                  <span>الفصل {{ semester }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </form>
+        </div>
+      </div>
+
+    
+      <div class="timetable-print-header">
+        <h2>
+          {% if selected_department_name %}
+            {{ selected_department_name }}
+          {% else %}
+            كل الأقسام
+          {% endif %}
+        </h2>
+      </div>
+
+      <div class="semester-stack">
+        {% for semester in selected_semesters %}
+          <section class="timetable-subsection" data-semester="{{ semester }}">
+            <div class="table-head mb-3 no-print">
+              <div>
+                <h3 class="mb-1">الفصل {{ semester }}</h3>
+                <p class="mb-0">
+                  {{ selected_department_name }}
+                </p>
+              </div>
+            </div>
+
+            <div class="timetable-table-wrap">
+              <table class="table table-bordered timetable-print-table">
+                <colgroup>
+                  <col class="day-col">
+                  {% for period in enabled_periods %}
+                    <col>
+                  {% endfor %}
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>اليوم</th>
+                    {% for period in enabled_periods %}
+                      <th data-period-code="{{ period.code }}">
+                        <div>{{ period.label }}</div>
+                        <small class="metadata-only text-muted">{{ period.start_time }} ← {{ period.end_time }}</small>
+                      </th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for day in days %}
+                    <tr>
+                      <td><div class="day-label" data-day-value="{{ day }}">{{ day_labels.get(day, day) }}</div></td>
+                      {% set ns = namespace(skip=0, merged_labels='') %}
+                      {% for period in enabled_periods %}
+                        {% if ns.skip > 0 %}
+                          {% set ns.skip = ns.skip - 1 %}
+                        {% else %}
+                          {# NEW: Slot as List Logic #}
+                          {% set entries = timetable.get(day, {}).get(semester, {}).get(period.code, []) %}
+                          {% set colspan = 1 %}
+                          
+                          {% if entries and entries|length == 1 %}
+                            {% set entry = entries[0] %}
+                            {% set ns.merged_labels = period.label %}
+                            {% set current_end = entry.end_time or period.end_time %}
+                            {% set ns.stop = 0 %}
+                            {% for next_period in enabled_periods[loop.index:] %}
+                              {% if ns.stop == 0 %}
+                                {% set next_entries = timetable.get(day, {}).get(semester, {}).get(next_period.code, []) %}
+                                {# ONLY merge if the next slot is TRULY empty (length 0) #}
+                                {% if next_entries|length == 0 and current_end > next_period.start_time %}
+                                  {% set colspan = colspan + 1 %}
+                                  {% set ns.skip = ns.skip + 1 %}
+                                  {% set ns.merged_labels = ns.merged_labels + ' + ' + next_period.label %}
+                                {% else %}
+                                  {# توقف إذا وجدنا حصة أخرى أو انتهى الوقت #}
+                                  {% set ns.stop = 1 %}
+                                {% endif %}
+                              {% endif %}
+                            {% endfor %}
+                          {% endif %}
+
+                        <td data-day="{{ day }}" data-semester="{{ semester }}" data-period="{{ period.code }}" 
+                            colspan="{{ colspan }}" 
+                            class="{% if colspan > 1 %}merged-period-cell{% endif %}">
+                          
+                          {# DEBUG PANEL #}
+                          <div style="background:rgba(0,0,0,0.05); color:var(--muted); font-size:10px; padding:2px;" class="no-print">
+                          <div style="background:rgba(0,0,0,0.03); color:var(--muted); font-size:10px; padding:2px;" class="no-print">
+                              Sem: {{ semester }} | Count: {{ entries|length }}
+                          </div>
+
+                          {% if entries|length > 0 %}
+                            {% for entry in entries %}
+                            <div class="schedule-item" data-edit-url="{{ url_for('timetable.timetable_form', id=entry.id, next=request.full_path.rstrip('?'), department_id=selected_department_id, modal=1) }}">
+                              {% if colspan > 1 %}
+                                <div class="merged-badge no-print" 
+                                     data-bs-toggle="tooltip" 
+                                     data-bs-placement="top" 
+                                     data-bs-title="الفترات المدمجة: {{ ns.merged_labels }}">
+                                  <span>🔗 مدمجة</span>
+                                </div>
+                              {% endif %}
+                              <div class="schedule-course">{{ entry.course_name }}</div>
+                              {% if not selected_department_name %}
+                                <div class="schedule-dept-label">{{ entry.course_department }}</div>
+                              {% endif %}
+                              <div class="schedule-teacher">{{ entry.teacher_name }}</div>
+                              <div class="schedule-room">{{ entry.room_name_ar or entry.room_name }}</div>
+                              <div class="schedule-time">
+                                {% set show_start = entry.start_time or period.start_time %}
+                                {% set show_end = entry.end_time or period.end_time %}
+                                <span>{{ show_start }} ← {{ show_end }}</span>
+                                {% if (entry.start_time and entry.start_time > period.start_time) or (entry.end_time and entry.end_time < period.end_time) %}
+                                  <span class="partial-indicator no-print">(بداية/نهاية جزئية)</span>
+                                {% endif %}
+                              </div>
+                              <div class="schedule-actions no-print">
+                                {% if can_delete_critical %}
+                                  <button class="btn btn-sm btn-outline-danger delete-entry-btn" type="button" data-id="{{ entry.id }}">حذف</button>
+                                {% endif %}
+                              </div>
+                            </div>
+                            {% endfor %}
+                          {% else %}
+                            <button
+                              type="button"
+                              class="empty-cell no-print"
+                              data-create-url="{{ url_for('timetable.timetable_form', day=day, semester=semester, section=period.code, modal=1) }}"
+                              data-period-time="{{ period.start_time }} - {{ period.end_time }}"
+                              aria-label="إضافة حصة ليوم {{ day_labels.get(day, day) }}، الفصل {{ semester }}، الفترة {{ period.label }}"
+                              title="انقر أو اضغط Enter لإضافة حصة في هذا المكان"
+                            >
+                              <span>إضافة حصة</span>
+                            </button>
+                            <div class="empty-slot d-none d-print-block">—</div>
+                          {% endif %}
+                        </td>
+                        {% endif %}
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        {% endfor %}
+      </div>
     </div>
   </section>
 </div>
 
 <script src="{{ url_for('static', filename='js/timetable.js') }}"></script>
+<script src="{{ url_for('static', filename='js/timetable-smart-borders.js') }}"></script>
 {% endblock %}
-
-
-

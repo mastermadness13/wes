@@ -1,23 +1,24 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash
 import db
 
-from routes import login_required, super_admin_required
+from routes import current_department_name, login_required
+from routes.access import is_super_admin
 
 students_bp = Blueprint('students', __name__)
 
 
 @students_bp.route('/')
 @login_required
-@super_admin_required
 def list_students():
     conn = db.get_db()
-    department = request.args.get('department', '')
+    requested_department = request.args.get('department', '')
+    department = requested_department if is_super_admin() else (current_department_name(conn) or '')
     class_name = request.args.get('class', '')
 
-    sql = 'SELECT * FROM students WHERE user_id = ?'
-    params = [session['user_id']]
+    sql = 'SELECT * FROM students WHERE department = ?'
+    params = [current_department_name(conn)]
 
-    if session.get('role') == 'super_admin':
+    if is_super_admin():
         sql = 'SELECT * FROM students WHERE 1=1'
         params = []
 
@@ -34,17 +35,15 @@ def list_students():
 
 @students_bp.route('/create', methods=['GET', 'POST'])
 @login_required
-@super_admin_required
 def create_student():
     if request.method == 'POST':
         name = request.form['name']
-        department = request.form['department']
-        class_name = request.form['class']
-
         conn = db.get_db()
+        department = request.form['department'] if is_super_admin() else (current_department_name(conn) or '')
+        class_name = request.form['class']
         conn.execute(
             'INSERT INTO students (user_id, name, department, class) VALUES (?, ?, ?, ?)',
-            (session['user_id'], name, department, class_name)
+            (session.get('user_id'), name, department, class_name)
         )
         conn.commit()
         flash('تم إضافة الطالب', 'success')
@@ -55,17 +54,16 @@ def create_student():
 
 @students_bp.route('/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
-@super_admin_required
 def edit_student(id):
     conn = db.get_db()
     student = conn.execute('SELECT * FROM students WHERE id = ?', (id,)).fetchone()
-    if not student or (student['user_id'] != session['user_id'] and session['role'] != 'super_admin'):
+    if not student or (not is_super_admin() and student['department'] != current_department_name(conn)):
         flash('غير مسموح', 'danger')
         return redirect(url_for('students.list_students'))
 
     if request.method == 'POST':
         name = request.form['name']
-        department = request.form['department']
+        department = request.form['department'] if is_super_admin() else (current_department_name(conn) or '')
         class_name = request.form['class']
         conn.execute(
             'UPDATE students SET name = ?, department = ?, class = ? WHERE id = ?',
@@ -80,11 +78,10 @@ def edit_student(id):
 
 @students_bp.route('/<int:id>/delete', methods=['POST'])
 @login_required
-@super_admin_required
 def delete_student(id):
     conn = db.get_db()
     student = conn.execute('SELECT * FROM students WHERE id = ?', (id,)).fetchone()
-    if not student or (student['user_id'] != session['user_id'] and session['role'] != 'super_admin'):
+    if not student or (not is_super_admin() and student['department'] != current_department_name(conn)):
         flash('غير مسموح', 'danger')
         return redirect(url_for('students.list_students'))
 

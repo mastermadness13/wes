@@ -2,61 +2,40 @@
 {% block content %}
 {% set current_view = request.full_path.rstrip('?') %}
 <div class="courses-page">
+  
+
   <section class="page-card courses-hero no-print">
     <div class="page-title">
       <div class="page-summary" data-once-hint="courses-hero-summary">
         <h2>المقررات</h2>
-        <p>إدارة المقررات من مكان واحد مع بحث سريع وفلترة حسب القسم والسنة، دون عرض أي بيانات غير موجودة فعليًا.</p>
+        <p>إدارة المقررات من مكان واحد مع بحث سريع وفلترة حسب القسم والسنة.</p>
       </div>
       <div class="courses-actions">
-        <a href="{{ url_for('courses.create_course') }}" class="btn btn-success">إضافة مقرر</a>
+        <a href="{{ url_for('courses.create_course') }}" class="btn btn-success">➕ إضافة مقرر</a>
         <a href="{{ url_for('courses.download_courses_excel') }}" class="btn btn-outline-primary">تنزيل Excel</a>
+        <form method="post" action="{{ url_for('courses.upload_courses_excel') }}" enctype="multipart/form-data" class="d-inline-block mb-0">
+          <input type="hidden" name="next" value="{{ current_view }}">
+          <label class="btn btn-primary mb-0" style="cursor: pointer;" title="استيراد من ملف Excel">
+            <span>📤 استيراد Excel</span>
+            <input type="file" name="excel_file" accept=".xlsx" required style="display: none;" onchange="this.form.submit()">
+          </label>
+        </form>
       </div>
     </div>
   </section>
 
   <section class="page-card courses-tools no-print">
-    <div class="courses-tool-grid">
-      <div class="import-panel">
-        <div class="section-header mb-3" data-once-hint="courses-import-header">
-          <div>
-            <h3>استيراد Excel</h3>
-            <p class="mb-0">ارفع ملف `.xlsx` مطابقًا للأعمدة الرسمية فقط.</p>
-          </div>
-        </div>
-        <form method="post" action="{{ url_for('courses.upload_courses_excel') }}" enctype="multipart/form-data" class="mini-grid">
-          <input type="hidden" name="next" value="{{ current_view }}">
-          <div class="form-group mb-0">
-            <label for="excel_file">ملف Excel</label>
-            <input id="excel_file" type="file" class="form-control-file" name="excel_file" accept=".xlsx" required>
-          </div>
-          <div>
-            <button class="btn btn-primary" type="submit">رفع الملف</button>
-          </div>
-        </form>
-        <div class="import-hint mt-3" data-once-hint="courses-import-format">
-          <strong>الأعمدة المطلوبة:</strong>
-          <ul class="helper-list">
-            <li>رمز المادة</li>
-            <li>اسم المادة</li>
-            <li>القسم</li>
-            <li>السنة</li>
-            <li>الملاحظات</li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="filter-panel">
+    <div class="filter-panel">
         <div class="section-header mb-3">
           <div>
             <h3>البحث والفلترة</h3>
-            <p class="mb-0">ابحث بالاسم أو الكود، ثم صفِّ النتائج حسب القسم والسنة.</p>
+            <p class="mb-0">ابحث بالاسم أو الكود، ثم صف النتائج حسب القسم والسنة.</p>
           </div>
         </div>
         <form method="get" class="mini-grid">
           <div class="form-group mb-0">
             <label for="courseSearchQuery">بحث</label>
-            <input id="courseSearchQuery" type="search" class="form-control" name="q" value="{{ search }}" placeholder="مثال: ه101 أو ميكانيكا موائع">
+            <input id="courseSearchQuery" type="search" class="form-control" name="q" value="{{ search }}" placeholder="مثال: ه101 أو ميكانيكا الموائع">
           </div>
           <div class="form-group mb-0">
             <label for="departmentFilter">القسم</label>
@@ -82,7 +61,6 @@
           </div>
         </form>
       </div>
-    </div>
   </section>
 
   <section class="page-card print-area">
@@ -103,6 +81,7 @@
             <th>القسم</th>
             <th>السنة</th>
             <th>الملاحظات</th>
+            <th class="no-print">الإجراءات</th>
           </tr>
         </thead>
         <tbody>
@@ -123,10 +102,16 @@
             <td>{{ c.department }}</td>
             <td>السنة {{ c.year }}</td>
             <td>{{ c.notes or '—' }}</td>
+            <td class="no-print">
+              <div class="d-flex justify-content-center gap-2">
+                <button type="button" class="btn btn-sm btn-outline-primary edit-course-btn">تعديل</button>
+                <button type="button" class="btn btn-sm btn-outline-danger delete-course-btn">حذف</button>
+              </div>
+            </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="6" class="text-center py-4 text-muted">لا توجد مقررات مطابقة للفلترة الحالية.</td>
+            <td colspan="7" class="text-center py-4 text-muted">لا توجد مقررات مطابقة للفلترة الحالية.</td>
           </tr>
           {% endfor %}
         </tbody>

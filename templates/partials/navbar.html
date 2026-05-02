@@ -1,83 +1,103 @@
-﻿{% set role = session.get('role', '') %}
+{% set role = session.get('role') %}
 {% set ep = request.endpoint or '' %}
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary rtl app-navbar">
-  <a class="navbar-brand app-brand" href="{{ url_for('auth.dashboard') }}">
-    <span class="brand-title">نظام إدارة أكاديمي</span>
-    {% if session.get('username') %}
-    <small class="brand-subtitle">
-      {{ session.get('username') }}
-      <span class="badge badge-light role-badge">{{ 'Super Admin' if role == 'super_admin' else 'Admin' }}</span>
-    </small>
-    {% endif %}
-  </a>
+<nav class="navbar navbar-expand-lg custom-navbar rtl shadow-sm no-print">
+  <div class="container-fluid px-4">
 
-  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="تبديل التنقل">
-    <span class="navbar-toggler-icon"></span>
-  </button>
+    <!-- Brand -->
+    <a class="navbar-brand d-flex align-items-center gap-2" href="{{ url_for('auth.dashboard') }}">
+      <span class="brand-title">نظام إدارة الأكاديمية</span>
 
-  <div class="collapse navbar-collapse" id="mainNavbar">
-    <ul class="navbar-nav mr-auto align-items-lg-center">
-      <li class="nav-item {{ 'active' if ep == 'auth.dashboard' else '' }}">
-        <a class="nav-link" href="{{ url_for('auth.dashboard') }}">الرئيسية</a>
-      </li>
-      {% if role == 'super_admin' %}
-        <li class="nav-item {{ 'active' if ep.startswith('courses.') else '' }}">
-          <a class="nav-link" href="{{ url_for('courses.list_courses') }}">المقررات</a>
+      {% if session.get('username') %}
+      <span class="brand-subtitle ml-2">
+        <span class="user-icon">👤</span> {{ session.get('username') }}
+        <span class="role-badge">
+          {{ 'مدير عام' if role == 'super_admin' else 'مدير قسم' }}
+        </span>
+      </span>
+      {% endif %}
+    </a>
+
+    <!-- Toggle -->
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#mainNavbar">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <!-- Nav -->
+    <div class="collapse navbar-collapse" id="mainNavbar">
+      <ul class="navbar-nav ml-auto align-items-lg-center gap-lg-2">
+
+        <!-- Home -->
+        <li class="nav-item {{ 'active' if ep == 'auth.dashboard' else '' }}">
+          <a class="nav-link" href="{{ url_for('auth.dashboard') }}">الرئيسية</a>
         </li>
-        <li class="nav-item {{ 'active' if ep.startswith('history.') else '' }}">
-          <a class="nav-link" href="{{ url_for('history.list_history') }}">سجل التغييرات</a>
-        </li>
+
+        {% if role == 'super_admin' %}
+        <!-- Academic Data -->
         <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="#" id="academicMenu" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <a class="nav-link dropdown-toggle" href="#" data-toggle="dropdown">
             البيانات الأكاديمية
           </a>
-          <div class="dropdown-menu" aria-labelledby="academicMenu">
+          <div class="dropdown-menu">
+            <a class="dropdown-item" href="{{ url_for('history.list_history') }}">سجل التغييرات</a>
             <a class="dropdown-item" href="{{ url_for('teachers.list_teachers') }}">المدرسون</a>
             <a class="dropdown-item" href="{{ url_for('students.list_students') }}">الطلاب</a>
             <a class="dropdown-item" href="{{ url_for('attendance.list_attendance') }}">الحضور</a>
+            <a class="dropdown-item" href="{{ url_for('courses.list_courses') }}">المقررات</a>
           </div>
         </li>
+
+        <!-- System Management -->
         <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="#" id="systemMenu" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+          <a class="nav-link dropdown-toggle" href="#" data-toggle="dropdown">
             إدارة النظام
           </a>
-          <div class="dropdown-menu" aria-labelledby="systemMenu">
+          <div class="dropdown-menu">
             <a class="dropdown-item" href="{{ url_for('users.list_users') }}">إدارة المستخدمين</a>
             <a class="dropdown-item" href="{{ url_for('departments.list_departments') }}">الأقسام</a>
             <a class="dropdown-item" href="{{ url_for('rooms.list_rooms') }}">القاعات</a>
           </div>
         </li>
-      {% endif %}
-      <li class="nav-item {{ 'active' if ep.startswith('timetable.') else '' }}">
-        <a class="nav-link" href="{{ url_for('timetable.list_timetable') }}">الجدول الدراسي</a>
-      </li>
-    </ul>
+        {% endif %}
 
-    <ul class="navbar-nav align-items-lg-center">
-      <li class="nav-item dropdown">
-        <a class="nav-link dropdown-toggle" href="#" id="uiSettingsMenu" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          الإعدادات
-        </a>
-        <div class="dropdown-menu dropdown-menu-right" aria-labelledby="uiSettingsMenu">
-          <h6 class="dropdown-header">المظهر</h6>
-          <a class="dropdown-item" href="#" onclick="setTheme('light'); return false;">فاتح</a>
-          <a class="dropdown-item" href="#" onclick="setTheme('dark'); return false;">داكن</a>
-          <a class="dropdown-item" href="#" onclick="setTheme('colorful'); return false;">ملون</a>
-          <div class="dropdown-divider"></div>
-          <h6 class="dropdown-header">حجم الخط</h6>
-          <a class="dropdown-item" href="#" onclick="setFontSize('font-small'); return false;">صغير</a>
-          <a class="dropdown-item" href="#" onclick="setFontSize('font-medium'); return false;">متوسط</a>
-          <a class="dropdown-item" href="#" onclick="setFontSize('font-large'); return false;">كبير</a>
-          <div class="dropdown-divider"></div>
-          <h6 class="dropdown-header">تنسيق الوقت</h6>
-          <a class="dropdown-item" href="#" onclick="setTimeFormat('24'); return false;">24 ساعة</a>
-          <a class="dropdown-item" href="#" onclick="setTimeFormat('12'); return false;">12 ساعة (AM/PM)</a>
-        </div>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" href="{{ url_for('auth.logout') }}">تسجيل الخروج</a>
-      </li>
-    </ul>
+        {% if role in ['admin', 'super_admin'] %}
+        <li class="nav-item {{ 'active' if ep.startswith('timetable.') else '' }}">
+          <a class="nav-link" href="{{ url_for('timetable.list_timetable') }}">الجدول الدراسي</a>
+        </li>
+        {% endif %}
+
+        <!-- UI Settings -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" data-toggle="dropdown">
+            المظهر
+          </a>
+          <div class="dropdown-menu dropdown-menu-right">
+            <h6 class="dropdown-header">اختر النمط</h6>
+            <a class="dropdown-item" href="#" onclick="setTheme('light'); return false;">وضع النهار</a>
+            <a class="dropdown-item" href="#" onclick="setTheme('dark'); return false;">وضع الليل</a>
+            <a class="dropdown-item" href="#" onclick="setTheme('colorful'); return false;">وضع ملون</a>
+
+            <div class="dropdown-divider"></div>
+
+            <h6 class="dropdown-header">حجم الخط</h6>
+            <a class="dropdown-item" href="#" onclick="setFontSize('font-small'); return false;">صغير</a>
+            <a class="dropdown-item" href="#" onclick="setFontSize('font-medium'); return false;">متوسط</a>
+            <a class="dropdown-item" href="#" onclick="setFontSize('font-large'); return false;">كبير</a>
+
+            <div class="dropdown-divider"></div>
+
+            <h6 class="dropdown-header">تنسيق الوقت</h6>
+            <a class="dropdown-item" href="#" onclick="setTimeFormat('24'); return false;">٢٤ ساعة</a>
+            <a class="dropdown-item" href="#" onclick="setTimeFormat('12'); return false;">١٢ ساعة</a>
+          </div>
+        </li>
+
+        <!-- Logout -->
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('auth.logout') }}">تسجيل الخروج</a>
+        </li>
+
+      </ul>
+    </div>
   </div>
 </nav>
