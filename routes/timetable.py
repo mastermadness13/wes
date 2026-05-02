@@ -966,10 +966,16 @@ def list_timetable():
     dept_info = dept_id_map.get(selected_department_id)
     selected_department_name = dept_info['name'] if dept_info else ''
 
-    allowed_semesters = _build_allowed_semesters(selected_department_name, department_semester_map)
-    # Super admins should be able to view all semesters; present semesters 1..8
-    if is_super_admin():
-        allowed_semesters = list(range(1, 9))
+    # Compute allowed semesters: respect department configuration when a specific
+    # department is selected; otherwise super_admin may see the full range.
+    if selected_department_name:
+        allowed_semesters = _build_allowed_semesters(selected_department_name, department_semester_map)
+    else:
+        # No specific department selected: super_admins can view full semester range
+        if is_super_admin():
+            allowed_semesters = list(range(1, 9))
+        else:
+            allowed_semesters = _build_allowed_semesters(selected_department_name, department_semester_map)
     
     if 'semester' in request.args:
         selected_semesters_raw = request.args.getlist('semester')
