@@ -408,14 +408,34 @@ def _validate_schedule_conflicts(
 
 def check_timetable_conflict(conn, department_id, day, semester, section, exclude_id=None):
     """Return a conflicting timetable row for the given department_id/day/semester/section, or None."""
-    sql = """
+    # department_id may be an integer id OR a department name (string).
+    params = []
+    base_sql = """
         SELECT t.id, c.name AS course_name
         FROM timetable t
         JOIN courses c ON c.id = t.course_id
-        WHERE t.department_id = ?
+        WHERE {dept_clause}
           AND t.day = ? AND t.semester = ? AND t.section = ?
     """
-    params = [department_id, day, semester, section]
+
+    # Normalize inputs
+    dept_raw = department_id
+    dept_clause = ''
+    if dept_raw is None:
+        return None
+
+    try:
+        dept_int = int(dept_raw)
+        # match by id OR by course.department name
+        dept_clause = '(t.department_id = ? OR LOWER(TRIM(c.department)) = LOWER(TRIM(?)))'
+        params.extend([dept_int, str(dept_raw)])
+    except Exception:
+        # treat as department name
+        dept_clause = 'LOWER(TRIM(c.department)) = LOWER(TRIM(?))'
+        params.append(str(dept_raw))
+
+    sql = base_sql.format(dept_clause=dept_clause)
+    params.extend([day, semester, section])
     if exclude_id is not None:
         sql += ' AND t.id != ?'
         params.append(exclude_id)
@@ -830,6 +850,7 @@ def timetable_form(id):
                 dept_semesters = int(dept_info.get('semesters'))
             except Exception:
                 dept_semesters = 0
+        # Prefer semester 2 by default when the department actually has multiple semesters.
         if dept_semesters > 1:
             default_sem_fallback = 2
 
@@ -946,6 +967,9 @@ def list_timetable():
     selected_department_name = dept_info['name'] if dept_info else ''
 
     allowed_semesters = _build_allowed_semesters(selected_department_name, department_semester_map)
+    # Super admins should be able to view all semesters; present semesters 1..8
+    if is_super_admin():
+        allowed_semesters = list(range(1, 9))
     
     if 'semester' in request.args:
         selected_semesters_raw = request.args.getlist('semester')
@@ -954,8 +978,11 @@ def list_timetable():
         selected_semesters_raw = session.get('selected_semesters', [])
 
     selected_semesters = [int(value) for value in selected_semesters_raw if str(value).isdigit() and int(value) in allowed_semesters]
+    # If the user didn't pass semester explicitly and the session contained a value,
+    # allow override for super_admin when a specific department is selected: prefer semester 2.
     if not selected_semesters:
-        # If a specific department is selected and that department has >1 semesters, prefer semester 2 when available
+        # If a specific department is selected, default to semester 2 for super_admins.
+        # Otherwise prefer department's configured semesters when available.
         dept_info = dept_id_map.get(selected_department_id)
         dept_semesters = 0
         if dept_info and dept_info.get('semesters') and str(dept_info.get('semesters')).isdigit():
@@ -963,10 +990,31 @@ def list_timetable():
                 dept_semesters = int(dept_info.get('semesters'))
             except Exception:
                 dept_semesters = 0
+
+        # If a specific department is selected and it supports multiple semesters,
+        # prefer semester 2. Do not force semester 2 for single-semester departments.
         if selected_department_id and dept_semesters > 1 and 2 in allowed_semesters:
             selected_semesters = [2]
+            session['selected_semesters'] = ['2']
         else:
             selected_semesters = [allowed_semesters[0]] if allowed_semesters else [1]
+    else:
+        # There may be a previously stored session selection. If a specific department is
+        # selected and that department actually supports more than one semester, default
+        # to semester 2 when the user didn't explicitly pass a semester in the request.
+        dept_info = dept_id_map.get(selected_department_id)
+        dept_semesters = 0
+        if dept_info and dept_info.get('semesters') and str(dept_info.get('semesters')).isdigit():
+            try:
+                dept_semesters = int(dept_info.get('semesters'))
+            except Exception:
+                dept_semesters = 0
+
+        if selected_department_id and dept_semesters > 1 and 'semester' not in request.args and 2 in allowed_semesters:
+            selected_semesters = [2]
+            session['selected_semesters'] = ['2']
+        else:
+            session['selected_semesters'] = [str(s) for s in selected_semesters]
 
     search = (request.args.get('q') or '').strip()
     enabled_periods = _get_periods(conn, enabled_only=True)
@@ -985,8 +1033,11 @@ def list_timetable():
     params = list(selected_semesters)
 
     if selected_department_id:
-        sql += ' AND t.department_id = ?'
+        # Some timetable rows store department by id, others only by course.department name.
+        # Match either the stored `department_id` or the course's `department` name (case-insensitive, trimmed).
+        sql += ' AND (t.department_id = ? OR LOWER(TRIM(c.department)) = LOWER(TRIM(?)))'
         params.append(selected_department_id)
+        params.append(selected_department_name or '')
 
     if search:
         sql += ' AND (te.name LIKE ? OR r.name LIKE ? OR r.name_ar LIKE ? OR c.name LIKE ?)'
@@ -994,6 +1045,53 @@ def list_timetable():
 
     sql += ' ORDER BY t.day, t.semester, t.section, t.created_at'
     rows = conn.execute(sql, params).fetchall()
+
+    # FALLBACK for export too: if department selected and no rows, try matching by
+    # course.department name or department admin owners (legacy data).
+    if selected_department_id and not rows:
+        try:
+            fallback_sql = """
+                SELECT t.*, c.name AS course_name, c.department AS course_department, te.name AS teacher_name, r.name AS room_name, r.name_ar AS room_name_ar
+                FROM timetable t
+                JOIN courses c ON c.id = t.course_id
+                JOIN teachers te ON te.id = t.teacher_id
+                JOIN rooms r ON r.id = t.room_id
+                WHERE t.semester IN ({}) AND (
+                    LOWER(TRIM(c.department)) = LOWER(TRIM(?))
+                    OR t.user_id IN (SELECT id FROM users WHERE role = 'admin' AND department_id = ?)
+                )
+            """.format(','.join('?' for _ in selected_semesters))
+            fb_params = list(selected_semesters)
+            fb_params.append(selected_department_name or '')
+            fb_params.append(selected_department_id)
+            rows = conn.execute(fallback_sql, fb_params).fetchall()
+        except Exception:
+            pass
+
+    # FALLBACK: If a specific department was requested but no rows returned,
+    # try to fetch rows by matching course.department name or entries owned by
+    # department admin users. This addresses legacy rows where t.department_id
+    # is NULL but c.department is populated.
+    if selected_department_id and not rows:
+        try:
+            fallback_sql = """
+                SELECT t.*, c.name AS course_name, c.department AS course_department,
+                       te.name AS teacher_name, r.name AS room_name, r.name_ar AS room_name_ar
+                FROM timetable t
+                JOIN courses c ON c.id = t.course_id
+                JOIN teachers te ON te.id = t.teacher_id
+                JOIN rooms r ON r.id = t.room_id
+                WHERE t.semester IN ({}) AND (
+                    LOWER(TRIM(c.department)) = LOWER(TRIM(?))
+                    OR t.user_id IN (SELECT id FROM users WHERE role = 'admin' AND department_id = ?)
+                )
+            """.format(','.join('?' for _ in selected_semesters))
+            fb_params = list(selected_semesters)
+            fb_params.append(selected_department_name or '')
+            fb_params.append(selected_department_id)
+            rows = conn.execute(fallback_sql, fb_params).fetchall()
+        except Exception:
+            pass
 
     timetable = {}
     for row in rows:
@@ -1080,8 +1178,9 @@ def export_timetable():
     params = list(selected_semesters)
 
     if selected_department_id:
-        sql += ' AND t.department_id = ?'
+        sql += ' AND (t.department_id = ? OR LOWER(TRIM(c.department)) = LOWER(TRIM(?)))'
         params.append(selected_department_id)
+        params.append(selected_department_name or '')
     if search:
         sql += ' AND (te.name LIKE ? OR r.name LIKE ? OR r.name_ar LIKE ? OR c.name LIKE ?)'
         params.extend([f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%'])
