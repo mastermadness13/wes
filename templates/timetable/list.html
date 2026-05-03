@@ -36,6 +36,19 @@
               <input type="hidden" name="department_id" value="{{ selected_department_id }}">
               <span class="toolbar-label">القسم: {{ selected_department_name }}</span>
             {% endif %}
+            {% if session.role != 'super_admin' %}
+            <div class="semester-controls d-flex align-items-center gap-2">
+              <label for="semesterSelect" class="mr-2">الفصل:</label>
+              <select id="semesterSelect" name="semester" class="form-control d-inline-block" data-autosubmit>
+                {% for semester in allowed_semesters %}
+                  <option value="{{ semester }}" {% if semester in selected_semesters %}selected{% endif %}>الفصل {{ semester }}</option>
+                {% endfor %}
+              </select>
+              <label class="ml-3 mb-0">
+                <input type="checkbox" name="show_all" value="1" data-autosubmit {% if selected_semesters|length == allowed_semesters|length %}checked{% endif %}> عرض الكل
+              </label>
+            </div>
+            {% else %}
             <div class="badge-stack semester-badge-stack">
               {% for semester in allowed_semesters %}
                 <label class="badge-soft semester-pill {% if semester in selected_semesters %}is-active{% endif %}">
@@ -44,6 +57,7 @@
                 </label>
               {% endfor %}
             </div>
+            {% endif %}
           </form>
         </div>
       </div>

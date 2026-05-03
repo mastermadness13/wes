@@ -842,7 +842,7 @@ def timetable_form(id):
     # - If editing an entry, preserve its semester.
     # - Otherwise, if the selected department has more than one semester, default to semester 2.
     default_sem_fallback = entry['semester'] if entry else 1
-    if not entry and dept_id:
+    if not entry and dept_id and not is_super_admin():
         dept_info = _department_id_map(conn).get(dept_id)
         dept_semesters = 0
         if dept_info and dept_info.get('semesters') and str(dept_info.get('semesters')).isdigit():
@@ -977,25 +977,30 @@ def list_timetable():
         else:
             allowed_semesters = _build_allowed_semesters(selected_department_name, department_semester_map)
     
-    if 'semester' in request.args:
-        selected_semesters_raw = request.args.getlist('semester')
-        session['selected_semesters'] = selected_semesters_raw
+    # Support a single-select `semester` plus an optional `show_all` toggle.
+    if 'semester' in request.args or 'show_all' in request.args:
+        # When user explicitly interacts, update session.
+        if 'semester' in request.args:
+            # single value or multiple values both handled by getlist
+            selected_semesters_raw = request.args.getlist('semester')
+        else:
+            selected_semesters_raw = []
+        # If show_all is present and truthy, select all allowed semesters
+        show_all_flag = str(request.args.get('show_all') or '').lower() in {'1', 'on', 'true', 'yes'}
+        if show_all_flag:
+            selected_semesters = list(allowed_semesters)
+            session['selected_semesters'] = [str(s) for s in selected_semesters]
+        else:
+            selected_semesters = [int(value) for value in selected_semesters_raw if str(value).isdigit() and int(value) in allowed_semesters]
+            session['selected_semesters'] = [str(s) for s in selected_semesters]
     else:
         selected_semesters_raw = session.get('selected_semesters', [])
-
-    selected_semesters = [int(value) for value in selected_semesters_raw if str(value).isdigit() and int(value) in allowed_semesters]
+        selected_semesters = [int(value) for value in selected_semesters_raw if str(value).isdigit() and int(value) in allowed_semesters]
     # If the user didn't pass semester explicitly and the session contained a value,
     # allow override for super_admin when a specific department is selected: prefer semester 2.
-    if not selected_semesters:
-        # If a specific department is selected, default to semester 2 for super_admins.
-        # Otherwise prefer department's configured semesters when available.
-        dept_info = dept_id_map.get(selected_department_id)
-        dept_semesters = 0
-        if dept_info and dept_info.get('semesters') and str(dept_info.get('semesters')).isdigit():
-            try:
-                dept_semesters = int(dept_info.get('semesters'))
-            except Exception:
-                dept_semesters = 0
+            # Compute allowed semesters using configured department semesters (no automatic
+            # expansion for super_admin). UI-level controls already differ per role.
+            allowed_semesters = _build_allowed_semesters(selected_department_name, department_semester_map)
 
         # If a specific department is selected and it supports multiple semesters,
         # prefer semester 2. Do not force semester 2 for single-semester departments.
